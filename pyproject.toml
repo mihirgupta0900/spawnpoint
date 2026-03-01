@@ -1,6 +1,5 @@
 [project]
 name = "spawnpoint"
-version = "0.1.0"
 description = "Spawn multi-repo worktree workspaces for feature development"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -17,6 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Software Development :: Version Control :: Git",
 ]
+dynamic = ["version"]
 dependencies = [
     "typer>=0.9",
     "InquirerPy>=0.3",
@@ -32,8 +32,15 @@ Issues = "https://github.com/mihirgupta0900/spawnpoint/issues"
 spawnpoint = "spawnpoint.cli:app"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.1.0"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/spawnpoint/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/spawnpoint"]

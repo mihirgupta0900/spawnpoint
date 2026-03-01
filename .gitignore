@@ -6,3 +6,4 @@ build/
 .env
 *.pyc
 .venv/
+src/spawnpoint/_version.py
