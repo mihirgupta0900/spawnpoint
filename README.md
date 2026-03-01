@@ -7,12 +7,6 @@ Working on a feature that spans multiple repos? Spawnpoint creates a dedicated f
 ## Install
 
 ```
-curl -fsSL https://raw.githubusercontent.com/mihirgupta0900/spawnpoint/main/install.sh | sh
-```
-
-Or with pipx:
-
-```
 pipx install spawnpoint
 ```
 
