@@ -1,8 +1,9 @@
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from rich.console import Console
 
@@ -137,26 +138,55 @@ def setup_dependencies(target_dir: Path):
         console.print(f"  [red]An error occurred during setup:[/red] {e}")
 
 
-def get_preferred_base_branches(repo_path: Path, branch_priority: List[str]) -> List[str]:
-    """Return available base branches sorted by priority."""
-    available = []
+def detect_default_branch(repo_path: Path) -> Optional[str]:
+    """Detect the repo's default branch using a fallback chain.
 
-    for branch in branch_priority:
-        # Check local
-        if subprocess.run(
-            ["git", "rev-parse", "--verify", branch],
-            cwd=repo_path, capture_output=True,
-        ).returncode == 0:
-            available.append(branch)
-            continue
-        # Check remote
-        if subprocess.run(
-            ["git", "rev-parse", "--verify", f"origin/{branch}"],
-            cwd=repo_path, capture_output=True,
-        ).returncode == 0:
-            available.append(f"origin/{branch}")
+    1. git symbolic-ref refs/remotes/origin/HEAD (local, instant)
+    2. git remote show origin (network, ~1-2s)
+    3. gh repo view --json defaultBranchRef (needs gh CLI + auth)
+    """
+    # Fallback 1: local symbolic-ref (instant)
+    try:
+        result = subprocess.run(
+            ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
+            cwd=repo_path, capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            # Output: refs/remotes/origin/main
+            ref = result.stdout.strip()
+            branch = ref.removeprefix("refs/remotes/origin/")
+            if branch and branch != ref:
+                return branch
+    except Exception:
+        pass
 
-    return available
+    # Fallback 2: git remote show origin (network call, 10s timeout)
+    try:
+        result = subprocess.run(
+            ["git", "remote", "show", "origin"],
+            cwd=repo_path, capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            match = re.search(r"HEAD branch:\s+(\S+)", result.stdout)
+            if match:
+                return match.group(1)
+    except (subprocess.TimeoutExpired, Exception):
+        pass
+
+    # Fallback 3: gh CLI (15s timeout)
+    try:
+        result = subprocess.run(
+            ["gh", "repo", "view", "--json", "defaultBranchRef", "-q", ".defaultBranchRef.name"],
+            cwd=repo_path, capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0:
+            branch = result.stdout.strip()
+            if branch:
+                return branch
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        pass
+
+    return None
 
 
 def make_display_path(path: Path, scan_dirs: List[Path]) -> str:

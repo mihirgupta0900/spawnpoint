@@ -10,8 +10,8 @@ from rich.progress import track
 from .config import Config
 from .utils import (
     copy_essential_files,
+    detect_default_branch,
     find_git_repos,
-    get_preferred_base_branches,
     make_display_path,
     setup_dependencies,
 )
@@ -71,6 +71,10 @@ def run_create(cfg: Config):
     for repo_path in track(selected_repos, description="Fetching & pruning..."):
         try:
             subprocess.run(["git", "fetch"], cwd=repo_path, capture_output=True)
+            subprocess.run(
+                ["git", "remote", "set-head", "origin", "--auto"],
+                cwd=repo_path, capture_output=True,
+            )
             subprocess.run(["git", "worktree", "prune"], cwd=repo_path, capture_output=True)
         except Exception as e:
             console.print(f"[yellow]Warning fetching {repo_path.name}: {e}[/yellow]")
@@ -118,18 +122,21 @@ def run_create(cfg: Config):
                 "branch": branch_name,
             })
         else:
-            # Branch needs creation — ask for base
-            defaults = get_preferred_base_branches(repo_path, cfg.branch_priority)
-            choices_list = defaults + ["Other (manual input)"]
-
-            base_branch = inquirer.select(
-                message=f"[{repo_name}] Branch '{branch_name}' not found. Create from:",
-                choices=choices_list,
-                default=defaults[0] if defaults else None,
-            ).execute()
-
-            if base_branch == "Other (manual input)":
-                base_branch = inquirer.text(message=f"[{repo_name}] Enter base branch:").execute()
+            # Branch needs creation — detect default branch
+            detected = detect_default_branch(repo_path)
+            if detected:
+                choices_list = [detected, "Other (manual input)"]
+                base_branch = inquirer.select(
+                    message=f"[{repo_name}] Branch '{branch_name}' not found. Create from:",
+                    choices=choices_list,
+                    default=detected,
+                ).execute()
+                if base_branch == "Other (manual input)":
+                    base_branch = inquirer.text(message=f"[{repo_name}] Enter base branch:").execute()
+            else:
+                base_branch = inquirer.text(
+                    message=f"[{repo_name}] Branch '{branch_name}' not found. Enter base branch:",
+                ).execute()
 
             repo_actions.append({
                 "type": "create",

@@ -69,12 +69,11 @@ copy_patterns_globs = ['.env*']
 copy_patterns_files = ['AGENT.md', 'CLAUDE.md', 'GEMINI.md']
 copy_patterns_dirs = ['.vscode', 'docs']
 
-# Branch priority for base branch selection
-branch_priority = ['development', 'staging', 'main', 'master']
-
 # Auto-install dependencies after worktree creation
 auto_install_deps = true
 ```
+
+When creating a new branch, Spawnpoint automatically detects the repo's default branch to use as the base. No configuration needed.
 
 ## Requirements
 

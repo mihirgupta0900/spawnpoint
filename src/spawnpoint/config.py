@@ -12,9 +12,6 @@ DEFAULT_COPY_PATTERNS_GLOBS = [".env*"]
 DEFAULT_COPY_PATTERNS_FILES = ["AGENT.md", "CLAUDE.md", "GEMINI.md"]
 DEFAULT_COPY_PATTERNS_DIRS = [".vscode", "docs"]
 
-DEFAULT_BRANCH_PRIORITY = ["development", "staging", "main", "master"]
-
-
 @dataclass
 class Config:
     scan_dirs: List[Path] = field(default_factory=list)
@@ -23,7 +20,6 @@ class Config:
     copy_patterns_globs: List[str] = field(default_factory=lambda: list(DEFAULT_COPY_PATTERNS_GLOBS))
     copy_patterns_files: List[str] = field(default_factory=lambda: list(DEFAULT_COPY_PATTERNS_FILES))
     copy_patterns_dirs: List[str] = field(default_factory=lambda: list(DEFAULT_COPY_PATTERNS_DIRS))
-    branch_priority: List[str] = field(default_factory=lambda: list(DEFAULT_BRANCH_PRIORITY))
     auto_install_deps: bool = True
 
 
@@ -67,8 +63,6 @@ def load_config() -> Config:
         cfg.copy_patterns_files = list(data["copy_patterns_files"])
     if "copy_patterns_dirs" in data:
         cfg.copy_patterns_dirs = list(data["copy_patterns_dirs"])
-    if "branch_priority" in data:
-        cfg.branch_priority = list(data["branch_priority"])
     if "auto_install_deps" in data:
         cfg.auto_install_deps = bool(data["auto_install_deps"])
 
@@ -108,9 +102,6 @@ def save_config(cfg: Config) -> Path:
         "",
         "# Directories to copy",
         f"copy_patterns_dirs = {repr(cfg.copy_patterns_dirs)}",
-        "",
-        "# Branch priority for base branch selection",
-        f"branch_priority = {repr(cfg.branch_priority)}",
         "",
         "# Auto-install dependencies after worktree creation",
         f"auto_install_deps = {'true' if cfg.auto_install_deps else 'false'}",
