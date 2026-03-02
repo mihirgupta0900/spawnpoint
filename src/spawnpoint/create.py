@@ -159,7 +159,7 @@ def run_create(cfg: Config):
         else:
             console.print(f"  {action['repo_name']}: [blue]create branch[/blue] '{action['branch']}' from '{action['base']}'")
 
-    if not inquirer.confirm(message="Proceed?").execute():
+    if not inquirer.confirm(message="Proceed?", default=True).execute():
         console.print("Aborted.")
         raise typer.Exit()
 
@@ -212,7 +212,9 @@ def run_create(cfg: Config):
     console.print("\n[bold green]Done![/bold green]")
 
     if is_single_repo and repo_actions:
-        console.print(f"Workspace: [bold blue]{repo_actions[0]['target_path']}[/bold blue]")
+        workspace_path = repo_actions[0]['target_path']
     else:
-        branch_dir = cfg.worktree_dir / normalized_branch_dir
-        console.print(f"Workspace: [bold blue]{branch_dir.resolve()}[/bold blue]")
+        workspace_path = (cfg.worktree_dir / normalized_branch_dir).resolve()
+
+    console.print(f"Workspace: [bold blue]{workspace_path}[/bold blue]")
+    console.print(f"\n[dim]cd {workspace_path}[/dim]")
