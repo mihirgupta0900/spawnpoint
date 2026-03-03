@@ -92,6 +92,68 @@ def _run_init():
     console.print(f"\n[green]Config saved to {path}[/green]")
     console.print(f"Run [bold]spawnpoint config[/bold] to view or edit later.\n")
 
+    _offer_shell_integration()
+
+
+_POSIX_SNIPPET = '\n# spawnpoint shell integration\nsp() { cd "$(spawnpoint create)"; }\n'
+_FISH_SNIPPET = '\n# spawnpoint shell integration\nfunction sp\n    cd (spawnpoint create)\nend\n'
+
+
+def _detect_shell_rc() -> list[Path]:
+    """Return existing shell rc files, in preference order."""
+    import os
+
+    candidates = []
+    shell = os.environ.get("SHELL", "")
+    home = Path.home()
+
+    # Prefer the active shell's rc first
+    if "zsh" in shell:
+        candidates = [home / ".zshrc", home / ".bashrc", home / ".bash_profile"]
+    elif "bash" in shell:
+        candidates = [home / ".bashrc", home / ".bash_profile", home / ".zshrc"]
+    elif "fish" in shell:
+        candidates = [home / ".config" / "fish" / "config.fish"]
+    else:
+        candidates = [home / ".zshrc", home / ".bashrc", home / ".bash_profile"]
+
+    return [p for p in candidates if p.exists()]
+
+
+def _offer_shell_integration():
+    """Offer to add the sp() shell function to the user's rc file."""
+    rc_files = _detect_shell_rc()
+
+    if not rc_files:
+        console.print("[dim]Tip: add this to your shell rc to auto-cd after creating a workspace:[/dim]")
+        console.print(f"[bold]{_POSIX_SNIPPET.strip()}[/bold]")
+        return
+
+    # Check if already installed in any of them
+    for rc in rc_files:
+        if "spawnpoint shell integration" in rc.read_text():
+            console.print(f"[dim]Shell integration already present in {rc}[/dim]")
+            return
+
+    choices = [str(rc) for rc in rc_files] + ["Skip"]
+    target = inquirer.select(
+        message="Add sp() shell function for auto-cd after create?",
+        choices=choices,
+        default=str(rc_files[0]),
+    ).execute()
+
+    if target == "Skip":
+        console.print("[dim]Skipped. You can add it manually:[/dim]")
+        console.print(f"[bold]{_POSIX_SNIPPET.strip()}[/bold]")
+        return
+
+    rc_path = Path(target)
+    snippet = _FISH_SNIPPET if "fish" in rc_path.parts or rc_path.suffix == ".fish" else _POSIX_SNIPPET
+    with rc_path.open("a") as f:
+        f.write(snippet)
+    console.print(f"[green]Added sp() to {rc_path}[/green]")
+    console.print(f"[dim]Restart your shell or run: source {rc_path}[/dim]")
+
 
 @app.command()
 def create():

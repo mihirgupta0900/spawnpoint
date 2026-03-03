@@ -77,6 +77,18 @@ auto_install_deps = true
 
 When creating a new branch, Spawnpoint automatically detects the repo's default branch to use as the base. No configuration needed.
 
+## Shell Integration
+
+Add this to your `~/.zshrc` or `~/.bashrc` to automatically `cd` into the workspace after creation:
+
+```sh
+sp() {
+  cd "$(spawnpoint create)"
+}
+```
+
+Then use `sp` instead of `spawnpoint create`.
+
 ## Requirements
 
 - Python 3.10+

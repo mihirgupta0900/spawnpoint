@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 
 import typer
 from InquirerPy import inquirer
+from InquirerPy.prompts.fuzzy import FuzzyPrompt
 from rich.console import Console
 from rich.progress import track
 
@@ -16,7 +17,15 @@ from .utils import (
     setup_dependencies,
 )
 
-console = Console()
+console = Console(stderr=True)
+
+
+class ClearOnToggleFuzzyPrompt(FuzzyPrompt):
+    """FuzzyPrompt that clears the search buffer when toggling a choice with Tab."""
+
+    def _handle_toggle_choice(self, _) -> None:
+        super()._handle_toggle_choice(_)
+        self._buffer.reset()
 
 
 def run_create(cfg: Config):
@@ -48,7 +57,7 @@ def run_create(cfg: Config):
     choices = [make_display_path(repo, valid_dirs) for repo in repos]
     choice_to_path = dict(zip(choices, repos))
 
-    selected_labels = inquirer.fuzzy(
+    selected_labels = ClearOnToggleFuzzyPrompt(
         message="Select repositories (type to search):",
         choices=choices,
         multiselect=True,
@@ -217,4 +226,4 @@ def run_create(cfg: Config):
         workspace_path = (cfg.worktree_dir / normalized_branch_dir).resolve()
 
     console.print(f"Workspace: [bold blue]{workspace_path}[/bold blue]")
-    console.print(f"\n[dim]cd {workspace_path}[/dim]")
+    print(workspace_path)  # stdout: consumed by shell wrapper for `cd`
