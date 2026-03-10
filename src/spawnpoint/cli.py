@@ -95,7 +95,7 @@ def _run_init():
     _offer_shell_integration()
 
 
-_CD_PATH_FILE = "~/.spawnpoint/.cd_path"
+_CD_PATH_FILE = "$HOME/.spawnpoint/.cd_path"
 
 _POSIX_SNIPPET = f"""
 # spawnpoint shell integration
