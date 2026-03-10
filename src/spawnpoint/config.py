@@ -20,6 +20,7 @@ class Config:
     copy_patterns_globs: List[str] = field(default_factory=lambda: list(DEFAULT_COPY_PATTERNS_GLOBS))
     copy_patterns_files: List[str] = field(default_factory=lambda: list(DEFAULT_COPY_PATTERNS_FILES))
     copy_patterns_dirs: List[str] = field(default_factory=lambda: list(DEFAULT_COPY_PATTERNS_DIRS))
+    additional_worktree_dirs: List[Path] = field(default_factory=list)
     auto_install_deps: bool = True
 
 
@@ -63,6 +64,8 @@ def load_config() -> Config:
         cfg.copy_patterns_files = list(data["copy_patterns_files"])
     if "copy_patterns_dirs" in data:
         cfg.copy_patterns_dirs = list(data["copy_patterns_dirs"])
+    if "additional_worktree_dirs" in data:
+        cfg.additional_worktree_dirs = [expand_path(d) for d in data["additional_worktree_dirs"]]
     if "auto_install_deps" in data:
         cfg.auto_install_deps = bool(data["auto_install_deps"])
 
@@ -90,6 +93,9 @@ def save_config(cfg: Config) -> Path:
         "",
         "# Where workspaces are created",
         f"worktree_dir = {repr(path_str(cfg.worktree_dir))}",
+        "",
+        "# Additional directories to scan during cleanup (for worktrees created at previous locations)",
+        f"additional_worktree_dirs = [{', '.join(repr(path_str(d)) for d in cfg.additional_worktree_dirs)}]",
         "",
         "# How deep to scan for repos (1-4)",
         f"scan_depth = {cfg.scan_depth}",

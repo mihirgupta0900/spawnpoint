@@ -164,6 +164,14 @@ def create():
 
 
 @app.command()
+def add():
+    """Add repos to an existing workspace (run from inside a workspace)."""
+    from .add import run_add
+    cfg = _ensure_config()
+    run_add(cfg)
+
+
+@app.command()
 def cleanup():
     """Select and remove worktree workspaces."""
     from .cleanup import run_cleanup

@@ -193,16 +193,27 @@ def _remove_worktree(wt: WorktreeInfo, delete_branch: bool):
 
 def run_cleanup(cfg: Config):
     """Remove worktree workspaces."""
-    work_dir = cfg.worktree_dir
+    work_dirs = [cfg.worktree_dir] + [
+        d for d in cfg.additional_worktree_dirs if d != cfg.worktree_dir
+    ]
+    existing_dirs = [d for d in work_dirs if d.exists()]
 
-    if not work_dir.exists():
+    if not existing_dirs:
         console.print("[yellow]No workspaces directory found.[/yellow]")
         raise typer.Exit()
 
     console.print("[bold blue]Scanning for worktree workspaces...[/bold blue]")
-    console.print(f"[dim]{work_dir}[/dim]")
+    for d in existing_dirs:
+        console.print(f"[dim]{d}[/dim]")
 
-    folders = _scan_work_dir(work_dir)
+    folders: List[BranchFolder] = []
+    seen_paths: set[Path] = set()
+    for work_dir in existing_dirs:
+        for bf in _scan_work_dir(work_dir):
+            resolved = bf.path.resolve()
+            if resolved not in seen_paths:
+                seen_paths.add(resolved)
+                folders.append(bf)
 
     if not folders:
         console.print("[yellow]No worktree workspaces found.[/yellow]")
