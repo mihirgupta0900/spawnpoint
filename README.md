@@ -124,7 +124,7 @@ During `sp init`, you'll be offered to install a shell function that wraps commo
 sp() {
     local cmd="${1:-create}"
     shift 2>/dev/null
-    local cd_file="~/.spawnpoint/.cd_path"
+    local cd_file="$HOME/.spawnpoint/.cd_path"
     rm -f "$cd_file"
     case "$cmd" in
         create)     spawnpoint create "$@" ;;
