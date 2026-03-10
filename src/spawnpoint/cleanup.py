@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +12,7 @@ from rich.console import Console
 from rich.progress import track
 
 from .config import Config
+from .log import logger
 
 console = Console()
 
@@ -83,15 +85,21 @@ def _get_mtime(path: Path) -> datetime:
 
 
 def _scan_worktree(path: Path) -> Optional[WorktreeInfo]:
+    logger.debug("Scanning worktree: %s", path)
     parent_repo = _parse_git_file(path)
     if parent_repo is None:
+        logger.debug("  Not a worktree (no .git file): %s", path)
         return None
+    branch = _get_branch_name(path)
+    dirty = _is_dirty(path)
+    mtime = _get_mtime(path)
+    logger.debug("  branch=%s dirty=%s parent=%s", branch, dirty, parent_repo)
     return WorktreeInfo(
         worktree_path=path,
         parent_repo_path=parent_repo,
-        branch_name=_get_branch_name(path),
-        is_dirty=_is_dirty(path),
-        last_modified=_get_mtime(path),
+        branch_name=branch,
+        is_dirty=dirty,
+        last_modified=mtime,
     )
 
 
@@ -99,7 +107,10 @@ def _scan_work_dir(work_dir: Path) -> List[BranchFolder]:
     if not work_dir.exists():
         return []
 
-    folders: List[BranchFolder] = []
+    logger.debug("Scanning work dir: %s", work_dir)
+
+    # Collect all worktree paths to scan
+    entries: List[tuple[Path, Path]] = []  # (branch_folder, worktree_path)
     seen_paths: set[Path] = set()
 
     for entry in sorted(work_dir.iterdir()):
@@ -110,25 +121,32 @@ def _scan_work_dir(work_dir: Path) -> List[BranchFolder]:
             continue
         seen_paths.add(resolved)
 
-        bf = BranchFolder(path=entry, name=entry.name)
-
         git_file = entry / ".git"
         if git_file.is_file():
-            # Single-repo worktree
-            wt = _scan_worktree(entry)
-            if wt:
-                bf.worktrees.append(wt)
+            entries.append((entry, entry))
         else:
-            # Multi-repo: check subdirectories
             for sub in sorted(entry.iterdir()):
                 if sub.is_dir() and (sub / ".git").is_file():
-                    wt = _scan_worktree(sub)
-                    if wt:
-                        bf.worktrees.append(wt)
+                    entries.append((entry, sub))
 
-        if bf.worktrees:
-            folders.append(bf)
+    logger.debug("Found %d worktree paths to scan", len(entries))
 
+    # Scan all worktrees in parallel
+    results: dict[Path, List[WorktreeInfo]] = {}
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(_scan_worktree, wt_path): (bf_path, wt_path) for bf_path, wt_path in entries}
+        for future in futures:
+            bf_path, wt_path = futures[future]
+            wt = future.result()
+            if wt:
+                results.setdefault(bf_path, []).append(wt)
+
+    folders: List[BranchFolder] = []
+    for bf_path, worktrees in results.items():
+        bf = BranchFolder(path=bf_path, name=bf_path.name, worktrees=worktrees)
+        folders.append(bf)
+
+    logger.debug("Found %d workspaces with worktrees", len(folders))
     return folders
 
 

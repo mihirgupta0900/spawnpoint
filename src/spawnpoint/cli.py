@@ -95,8 +95,49 @@ def _run_init():
     _offer_shell_integration()
 
 
-_POSIX_SNIPPET = '\n# spawnpoint shell integration\nsp() { cd "$(spawnpoint create)"; }\n'
-_FISH_SNIPPET = '\n# spawnpoint shell integration\nfunction sp\n    cd (spawnpoint create)\nend\n'
+_CD_PATH_FILE = "~/.spawnpoint/.cd_path"
+
+_POSIX_SNIPPET = f"""
+# spawnpoint shell integration
+sp() {{
+    local cmd="${{1:-create}}"
+    shift 2>/dev/null
+    local cd_file="{_CD_PATH_FILE}"
+    rm -f "$cd_file"
+    case "$cmd" in
+        create)     spawnpoint create "$@" ;;
+        list|ls)    spawnpoint list --cd "$@" ;;
+        *)          spawnpoint "$cmd" "$@" ;;
+    esac
+    if [ -f "$cd_file" ]; then
+        local dir=$(cat "$cd_file")
+        rm -f "$cd_file"
+        [ -n "$dir" ] && cd "$dir"
+    fi
+}}
+"""
+_FISH_SNIPPET = f"""
+# spawnpoint shell integration
+function sp
+    set cmd (test (count $argv) -gt 0; and echo $argv[1]; or echo create)
+    set rest $argv[2..]
+    set cd_file "{_CD_PATH_FILE}"
+    rm -f $cd_file
+    switch $cmd
+        case create
+            spawnpoint create $rest
+        case list ls
+            spawnpoint list --cd $rest
+        case '*'
+            spawnpoint $cmd $rest
+    end
+    if test -f $cd_file
+        set dir (cat $cd_file)
+        rm -f $cd_file
+        test -n "$dir"; and cd $dir
+    end
+end
+"""
 
 
 def _detect_shell_rc() -> list[Path]:
@@ -171,6 +212,16 @@ def add():
     run_add(cfg)
 
 
+@app.command(name="list")
+def list_cmd(
+    cd: bool = typer.Option(False, "--cd", "-c", help="Interactively select a workspace to cd into"),
+):
+    """List all worktree workspaces."""
+    from .list import run_list
+    cfg = _ensure_config()
+    run_list(cfg, cd=cd)
+
+
 @app.command()
 def cleanup():
     """Select and remove worktree workspaces."""
@@ -189,6 +240,7 @@ def init():
         ).execute()
         if not overwrite:
             console.print("Keeping existing config.")
+            _offer_shell_integration()
             raise typer.Exit()
     _run_init()
 
@@ -265,6 +317,11 @@ def main(
         callback=version_callback,
         is_eager=True,
     ),
+    debug: bool = typer.Option(
+        False, "--debug",
+        help="Enable debug logging.",
+    ),
 ):
     """Spawnpoint — Spawn multi-repo worktree workspaces for feature development."""
-    pass
+    from .log import setup_logging
+    setup_logging(debug=debug)

@@ -5,6 +5,7 @@ from typing import List
 
 SPAWNPOINT_DIR = Path.home() / ".spawnpoint"
 CONFIG_PATH = SPAWNPOINT_DIR / "config.toml"
+CD_PATH_FILE = SPAWNPOINT_DIR / ".cd_path"
 
 COMMON_CODE_DIRS = ["~/code", "~/projects", "~/repos", "~/src", "~/dev"]
 

@@ -30,6 +30,7 @@ Issues = "https://github.com/mihirgupta0900/spawnpoint/issues"
 
 [project.scripts]
 spawnpoint = "spawnpoint.cli:app"
+sp = "spawnpoint.cli:app"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]

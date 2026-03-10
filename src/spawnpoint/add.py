@@ -1,4 +1,5 @@
 import subprocess
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -9,6 +10,7 @@ from rich.console import Console
 from rich.progress import track
 
 from .config import Config
+from .log import logger
 from .utils import (
     copy_essential_files,
     detect_default_branch,
@@ -133,7 +135,9 @@ def run_add(cfg: Config):
         raise typer.Exit(code=1)
 
     console.print(f"\n[bold blue]Scanning for git repositories...[/bold blue]")
+    start = time.monotonic()
     repos = find_git_repos(valid_dirs, cfg.scan_depth)
+    logger.debug("Repo scan completed in %.2fs, found %d repos", time.monotonic() - start, len(repos))
 
     # Filter out repos already in the workspace
     repos = [r for r in repos if r.name not in existing_names]

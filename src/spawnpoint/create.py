@@ -1,4 +1,5 @@
 import subprocess
+import time
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -8,7 +9,8 @@ from InquirerPy.prompts.fuzzy import FuzzyPrompt
 from rich.console import Console
 from rich.progress import track
 
-from .config import Config
+from .config import CD_PATH_FILE, Config
+from .log import logger
 from .utils import (
     copy_essential_files,
     detect_default_branch,
@@ -47,7 +49,9 @@ def run_create(cfg: Config):
     for d in valid_dirs:
         console.print(f"  [dim]{d}[/dim]")
 
+    start = time.monotonic()
     repos = find_git_repos(valid_dirs, cfg.scan_depth)
+    logger.debug("Repo scan completed in %.2fs, found %d repos", time.monotonic() - start, len(repos))
 
     if not repos:
         console.print("[yellow]No git repositories found.[/yellow]")
@@ -226,4 +230,4 @@ def run_create(cfg: Config):
         workspace_path = (cfg.worktree_dir / normalized_branch_dir).resolve()
 
     console.print(f"Workspace: [bold blue]{workspace_path}[/bold blue]")
-    print(workspace_path)  # stdout: consumed by shell wrapper for `cd`
+    CD_PATH_FILE.write_text(str(workspace_path))
