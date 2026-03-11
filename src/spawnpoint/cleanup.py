@@ -191,6 +191,8 @@ def _remove_worktree(wt: WorktreeInfo, delete_branch: bool):
         if wt.worktree_path.exists():
             console.print(f"  [yellow]Falling back to rmtree[/yellow]")
             shutil.rmtree(wt.worktree_path, ignore_errors=True)
+        # Prune so git forgets the removed worktree (needed for branch delete)
+        subprocess.run(["git", "worktree", "prune"], cwd=parent, capture_output=True)
 
     if delete_branch and wt.branch_name not in ("unknown", "HEAD"):
         result = subprocess.run(
