@@ -1,5 +1,7 @@
 # Spawnpoint
 
+![Spawnpoint](./assets/social-preview.png)
+
 Spawn multi-repo worktree workspaces for feature development.
 
 Working on a feature that spans multiple repos? Spawnpoint creates a dedicated folder with git worktrees from each repo on the same branch, installs dependencies, and copies over config files — so you can start coding (or start a Claude session) immediately.
