@@ -279,7 +279,16 @@ def run_add(cfg: Config):
                     console.print(f"  [red]Failed:[/red] {result.stderr.strip()}")
 
             elif action["type"] == "create":
-                cmd = ["git", "worktree", "add", "-b", action["branch"], str(target_path), action["base"]]
+                # Resolve to remote tip if available (fetch already ran in Phase 1)
+                start_point = action["base"]
+                check = subprocess.run(
+                    ["git", "rev-parse", "--verify", f"origin/{action['base']}"],
+                    cwd=repo_path, capture_output=True,
+                )
+                if check.returncode == 0:
+                    start_point = f"origin/{action['base']}"
+
+                cmd = ["git", "worktree", "add", "-b", action["branch"], str(target_path), start_point]
                 result = subprocess.run(cmd, cwd=repo_path, text=True, capture_output=True)
                 if result.returncode == 0:
                     success = True
