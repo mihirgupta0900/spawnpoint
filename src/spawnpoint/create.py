@@ -207,7 +207,7 @@ def run_create(cfg: Config):
                 if check.returncode == 0:
                     start_point = f"origin/{action['base']}"
 
-                cmd = ["git", "worktree", "add", "-b", action["branch"], str(target_path), start_point]
+                cmd = ["git", "worktree", "add", "--no-track", "-b", action["branch"], str(target_path), start_point]
                 result = subprocess.run(cmd, cwd=repo_path, text=True, capture_output=True)
                 if result.returncode == 0:
                     success = True
