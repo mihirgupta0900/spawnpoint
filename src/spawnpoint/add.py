@@ -23,11 +23,24 @@ console = Console(stderr=True)
 
 
 class ClearOnToggleFuzzyPrompt(FuzzyPrompt):
-    """FuzzyPrompt that clears the search buffer when toggling a choice with Tab."""
+    """FuzzyPrompt that clears search and shows selected repos on toggle."""
 
     def _handle_toggle_choice(self, _) -> None:
         super()._handle_toggle_choice(_)
         self._buffer.reset()
+        # Reset filtered list to show all choices (not just previous search results)
+        for choice in self.content_control.choices:
+            choice["indices"] = []
+        self.content_control._filtered_choices = self.content_control.choices
+
+    def _generate_after_input(self):
+        display = super()._generate_after_input()
+        selected = self.selected_choices
+        if selected:
+            names = ", ".join(c["name"] for c in selected)
+            display.append(("", "  "))
+            display.append(("class:fuzzy_info", f"Selected: {names}"))
+        return display
 
 
 def _detect_workspace(cfg: Config) -> Optional[Tuple[Path, str]]:
