@@ -1,3 +1,4 @@
+import atexit
 import shutil
 import subprocess
 import sys
@@ -325,3 +326,27 @@ def main(
     """Spawnpoint — Spawn multi-repo worktree workspaces for feature development."""
     from .log import setup_logging
     setup_logging(debug=debug)
+
+    # Non-blocking update check (skip for update/version commands)
+    _args = sys.argv[1:]
+    _skip_commands = {"update", "--version", "-v"}
+    if not _skip_commands.intersection(_args):
+        from .config import load_config as _load_cfg
+        try:
+            cfg = _load_cfg()
+            if cfg.check_updates:
+                from .version_check import get_update_notice, start_check
+                start_check(__version__)
+                atexit.register(_show_update_notice)
+        except Exception:
+            pass
+
+
+def _show_update_notice() -> None:
+    try:
+        from .version_check import get_update_notice
+        notice = get_update_notice()
+        if notice:
+            Console(stderr=True).print(notice)
+    except Exception:
+        pass

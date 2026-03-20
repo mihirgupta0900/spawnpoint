@@ -105,6 +105,9 @@ copy_patterns_dirs = ['.vscode', 'docs']
 
 # Auto-install dependencies after worktree creation
 auto_install_deps = true
+
+# Check for new versions on startup
+check_updates = true
 ```
 
 ### Additional worktree dirs

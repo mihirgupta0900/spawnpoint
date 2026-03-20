@@ -23,6 +23,7 @@ class Config:
     copy_patterns_dirs: List[str] = field(default_factory=lambda: list(DEFAULT_COPY_PATTERNS_DIRS))
     additional_worktree_dirs: List[Path] = field(default_factory=list)
     auto_install_deps: bool = True
+    check_updates: bool = True
 
 
 def expand_path(p: str) -> Path:
@@ -69,6 +70,8 @@ def load_config() -> Config:
         cfg.additional_worktree_dirs = [expand_path(d) for d in data["additional_worktree_dirs"]]
     if "auto_install_deps" in data:
         cfg.auto_install_deps = bool(data["auto_install_deps"])
+    if "check_updates" in data:
+        cfg.check_updates = bool(data["check_updates"])
 
     return cfg
 
@@ -112,6 +115,9 @@ def save_config(cfg: Config) -> Path:
         "",
         "# Auto-install dependencies after worktree creation",
         f"auto_install_deps = {'true' if cfg.auto_install_deps else 'false'}",
+        "",
+        "# Check for new versions on startup",
+        f"check_updates = {'true' if cfg.check_updates else 'false'}",
         "",
     ]
 
