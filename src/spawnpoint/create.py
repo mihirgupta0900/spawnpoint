@@ -97,7 +97,7 @@ def _branch_exists_in_any_repo(branch_name: str, repos: list[Path]) -> bool:
     return False
 
 
-def run_create(cfg: Config, yes: bool = False):
+def run_create(cfg: Config, yes: bool = False, desc: str = ""):
     """Select git repos and create worktrees for a feature branch."""
     if not cfg.scan_dirs:
         console.print("[bold red]Error:[/bold red] No scan directories configured.")
@@ -317,6 +317,10 @@ def run_create(cfg: Config, yes: bool = False):
         workspace_path = repo_actions[0]['target_path']
     else:
         workspace_path = (cfg.worktree_dir / normalized_branch_dir).resolve()
+
+    if desc:
+        meta_path = workspace_path / ".spawnpoint-meta"
+        meta_path.write_text(f'description = "{desc}"\n')
 
     console.print(f"Workspace: [bold blue]{workspace_path}[/bold blue]")
     CD_PATH_FILE.write_text(str(workspace_path))
