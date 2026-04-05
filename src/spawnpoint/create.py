@@ -1,3 +1,4 @@
+import random
 import subprocess
 import time
 from pathlib import Path
@@ -18,6 +19,43 @@ from .utils import (
     make_display_path,
     setup_dependencies,
 )
+
+_ADJECTIVES = [
+    "bold", "brave", "bright", "calm", "clean", "clear", "cool", "crisp",
+    "dark", "deep", "dry", "fair", "fast", "firm", "flat", "fond", "free",
+    "fresh", "full", "glad", "gold", "grand", "great", "green", "half",
+    "happy", "hard", "high", "hot", "keen", "kind", "last", "late", "lean",
+    "light", "live", "long", "loud", "low", "mild", "neat", "new", "next",
+    "odd", "old", "open", "pale", "pink", "plain", "pure", "quick", "quiet",
+    "rare", "raw", "red", "rich", "ripe", "safe", "sharp", "shy", "slim",
+    "slow", "small", "smart", "soft", "solid", "spare", "still", "strong",
+    "sure", "sweet", "swift", "tall", "tame", "thin", "tiny", "true",
+    "vast", "warm", "wide", "wild", "wise", "young",
+]
+
+_NOUNS = [
+    "ash", "bay", "bear", "birch", "bird", "bloom", "bluff", "bog", "brook",
+    "bush", "cairn", "cave", "cedar", "cliff", "cloud", "coast", "coral",
+    "cove", "crane", "creek", "crow", "dale", "dawn", "deer", "delta",
+    "dove", "drift", "dune", "dusk", "eagle", "elm", "ember", "fern",
+    "finch", "fjord", "flame", "flint", "fog", "ford", "fox", "frost",
+    "gale", "glen", "grove", "gull", "hare", "hawk", "hazel", "heath",
+    "heron", "hill", "hollow", "ivy", "jade", "jay", "lake", "larch",
+    "lark", "leaf", "lily", "lodge", "lynx", "maple", "marsh", "mesa",
+    "mint", "mist", "moss", "oak", "owl", "palm", "peak", "pebble",
+    "pine", "plum", "pond", "quail", "rain", "raven", "reed", "ridge",
+    "river", "robin", "rock", "rose", "sage", "sand", "seed", "shade",
+    "shore", "slate", "snow", "spark", "spruce", "star", "stone", "storm",
+    "summit", "thorn", "tide", "trail", "trout", "vale", "vine", "wave",
+    "willow", "wind", "wolf", "wren",
+]
+
+
+def _generate_branch_name() -> str:
+    """Generate a random branch name like sp-swift-falcon."""
+    adj = random.choice(_ADJECTIVES)
+    noun = random.choice(_NOUNS)
+    return f"sp-{adj}-{noun}"
 
 console = Console(stderr=True)
 
@@ -43,7 +81,23 @@ class ClearOnToggleFuzzyPrompt(FuzzyPrompt):
         return display
 
 
-def run_create(cfg: Config):
+def _branch_exists_in_any_repo(branch_name: str, repos: list[Path]) -> bool:
+    """Check if a branch name exists locally or remotely in any of the given repos."""
+    for repo_path in repos:
+        local = subprocess.run(
+            ["git", "rev-parse", "--verify", branch_name],
+            cwd=repo_path, capture_output=True,
+        ).returncode == 0
+        remote = subprocess.run(
+            ["git", "rev-parse", "--verify", f"origin/{branch_name}"],
+            cwd=repo_path, capture_output=True,
+        ).returncode == 0
+        if local or remote:
+            return True
+    return False
+
+
+def run_create(cfg: Config, yes: bool = False):
     """Select git repos and create worktrees for a feature branch."""
     if not cfg.scan_dirs:
         console.print("[bold red]Error:[/bold red] No scan directories configured.")
@@ -84,13 +138,23 @@ def run_create(cfg: Config):
         console.print("No repositories selected. Exiting.")
         raise typer.Exit()
 
-    branch_name = inquirer.text(message="Enter the branch name:").execute()
-
-    if not branch_name:
-        console.print("Branch name cannot be empty.")
-        raise typer.Exit(code=1)
-
     selected_repos = [choice_to_path[label] for label in selected_labels]
+
+    if yes:
+        for attempt in range(3):
+            branch_name = _generate_branch_name()
+            if not _branch_exists_in_any_repo(branch_name, selected_repos):
+                break
+        else:
+            console.print("[bold red]Error:[/bold red] Could not generate a unique branch name after 3 attempts.")
+            console.print("Please run without -y and enter a branch name manually.")
+            raise typer.Exit(code=1)
+        console.print(f"[bold blue]Branch:[/bold blue] {branch_name}")
+    else:
+        branch_name = inquirer.text(message="Enter the branch name:").execute()
+        if not branch_name:
+            console.print("Branch name cannot be empty.")
+            raise typer.Exit(code=1)
 
     # Phase 1: Fetch & prune
     console.print(f"\n[bold blue]Preparing repositories...[/bold blue]")
@@ -150,7 +214,10 @@ def run_create(cfg: Config):
         else:
             # Branch needs creation — detect default branch
             detected = detect_default_branch(repo_path)
-            if detected:
+            if yes and detected:
+                base_branch = detected
+                console.print(f"  [dim]{repo_name}: creating from {detected}[/dim]")
+            elif detected:
                 choices_list = [detected, "Other (manual input)"]
                 base_branch = inquirer.select(
                     message=f"[{repo_name}] Branch '{branch_name}' not found. Create from:",
@@ -185,7 +252,7 @@ def run_create(cfg: Config):
         else:
             console.print(f"  {action['repo_name']}: [blue]create branch[/blue] '{action['branch']}' from '{action['base']}'")
 
-    if not inquirer.confirm(message="Proceed?", default=True).execute():
+    if not yes and not inquirer.confirm(message="Proceed?", default=True).execute():
         console.print("Aborted.")
         raise typer.Exit()
 
