@@ -186,7 +186,8 @@ def run_list(cfg: Config, cd: bool = False, detail: bool = False):
     # Sort newest-first for listing
     folders.sort(key=lambda bf: bf.oldest_modified, reverse=True)
 
-    _print_table(folders)
+    if not cd or detail:
+        _print_table(folders)
 
     if not cd and not detail:
         return
