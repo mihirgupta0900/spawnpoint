@@ -26,10 +26,8 @@ This installs both `spawnpoint` and `sp` as CLI commands. All examples below use
 
 ```
 sp create     # select repos, name a branch, spawn worktrees
-sp create -y  # select repos, auto-generate branch name, skip confirmations
-sp create --desc "payment refactor"  # add a description to the workspace
+sp create -y  # auto-select default base branches (skip base branch prompts)
 sp list       # view all workspaces
-sp list --detail  # select a workspace to see repos, commits, and PRs
 sp add        # add repos to the current workspace
 sp cleanup    # select and remove worktree workspaces
 ```
@@ -53,11 +51,9 @@ All worktrees land in a single folder (`~/.spawnpoint/workspaces/<branch-name>/`
 | Command | Description |
 |---|---|
 | `sp create` | Spawn worktree workspaces |
-| `sp create -y` | Quick-create with auto-generated branch name |
-| `sp create --desc "..."` | Add a description to the workspace |
-| `sp list` | List all workspaces with repos and descriptions |
+| `sp create -y` | Auto-select default base branches |
+| `sp list` | List all workspaces |
 | `sp list --cd` | Interactively select a workspace to cd into |
-| `sp list --detail` | Show detailed info for a selected workspace |
 | `sp add` | Add repos to the current workspace |
 | `sp cleanup` | Remove worktree workspaces |
 | `sp init` | Run interactive setup |

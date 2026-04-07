@@ -199,13 +199,12 @@ def _offer_shell_integration():
 
 @app.command()
 def create(
-    yes: bool = typer.Option(False, "--yes", "-y", help="Auto-generate branch name and skip confirmations"),
-    desc: str = typer.Option("", "--desc", "-d", help="Short description for this workspace"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Auto-select default base branch when creating new branches"),
 ):
     """Select repos and spawn worktree workspaces for a feature branch."""
     from .create import run_create
     cfg = _ensure_config()
-    run_create(cfg, yes=yes, desc=desc)
+    run_create(cfg, yes=yes)
 
 
 @app.command()
@@ -219,12 +218,11 @@ def add():
 @app.command(name="list")
 def list_cmd(
     cd: bool = typer.Option(False, "--cd", "-c", help="Interactively select a workspace to cd into"),
-    detail: bool = typer.Option(False, "--detail", help="Show detailed info for a selected workspace"),
 ):
     """List all worktree workspaces."""
     from .list import run_list
     cfg = _ensure_config()
-    run_list(cfg, cd=cd, detail=detail)
+    run_list(cfg, cd=cd)
 
 
 @app.command()

@@ -378,11 +378,6 @@ def _restructure_to_multi_repo(workspace_dir: Path):
         new_git_file.write_text(f"gitdir: {abs_gitdir}\n")
     # If absolute, no change needed
 
-    # Preserve workspace metadata (moved into sub_dir during restructure)
-    meta_in_sub = sub_dir / ".spawnpoint-meta"
-    if meta_in_sub.exists():
-        shutil.move(str(meta_in_sub), str(workspace_dir / ".spawnpoint-meta"))
-
     # Also update the worktree config in the parent repo's .git/worktrees/<name>/gitdir
     gitdir_resolved = gitdir if gitdir.is_absolute() else (workspace_dir / gitdir).resolve()
     gitdir_file = gitdir_resolved / "gitdir"
