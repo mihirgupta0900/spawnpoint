@@ -43,7 +43,7 @@ class ClearOnToggleFuzzyPrompt(FuzzyPrompt):
         return display
 
 
-def run_create(cfg: Config):
+def run_create(cfg: Config, yes: bool = False):
     """Select git repos and create worktrees for a feature branch."""
     if not cfg.scan_dirs:
         console.print("[bold red]Error:[/bold red] No scan directories configured.")
@@ -84,13 +84,12 @@ def run_create(cfg: Config):
         console.print("No repositories selected. Exiting.")
         raise typer.Exit()
 
-    branch_name = inquirer.text(message="Enter the branch name:").execute()
+    selected_repos = [choice_to_path[label] for label in selected_labels]
 
+    branch_name = inquirer.text(message="Enter the branch name:").execute()
     if not branch_name:
         console.print("Branch name cannot be empty.")
         raise typer.Exit(code=1)
-
-    selected_repos = [choice_to_path[label] for label in selected_labels]
 
     # Phase 1: Fetch & prune
     console.print(f"\n[bold blue]Preparing repositories...[/bold blue]")
@@ -150,7 +149,10 @@ def run_create(cfg: Config):
         else:
             # Branch needs creation — detect default branch
             detected = detect_default_branch(repo_path)
-            if detected:
+            if yes and detected:
+                base_branch = detected
+                console.print(f"  [dim]{repo_name}: creating from {detected}[/dim]")
+            elif detected:
                 choices_list = [detected, "Other (manual input)"]
                 base_branch = inquirer.select(
                     message=f"[{repo_name}] Branch '{branch_name}' not found. Create from:",

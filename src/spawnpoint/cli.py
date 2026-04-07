@@ -198,11 +198,13 @@ def _offer_shell_integration():
 
 
 @app.command()
-def create():
+def create(
+    yes: bool = typer.Option(False, "--yes", "-y", help="Auto-select default base branch when creating new branches"),
+):
     """Select repos and spawn worktree workspaces for a feature branch."""
     from .create import run_create
     cfg = _ensure_config()
-    run_create(cfg)
+    run_create(cfg, yes=yes)
 
 
 @app.command()
