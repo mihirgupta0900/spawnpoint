@@ -9,6 +9,7 @@ from rich.table import Table
 
 from .cleanup import BranchFolder, _format_age, _scan_work_dir
 from .config import CD_PATH_FILE, Config
+from .io import emit_json
 from .log import logger
 
 console = Console(stderr=True)
@@ -35,18 +36,43 @@ def _collect_folders(cfg: Config) -> List[BranchFolder]:
     return folders
 
 
-def run_list(cfg: Config, cd: bool = False):
+def _folder_payload(bf: BranchFolder) -> dict:
+    branches = sorted({w.branch_name for w in bf.worktrees})
+    return {
+        "name": bf.name,
+        "path": str(bf.path),
+        "repos": len(bf.worktrees),
+        "branches": branches,
+        "dirty": bf.any_dirty,
+    }
+
+
+def run_list(
+    cfg: Config,
+    cd: bool = False,
+    *,
+    no_input: bool = False,
+    workspace: str | None = None,
+    json_output: bool = False,
+):
     """List all worktree workspaces, optionally selecting one to cd into."""
     start = time.monotonic()
     folders = _collect_folders(cfg)
     logger.debug("Scan completed in %.2fs, found %d workspaces", time.monotonic() - start, len(folders))
 
     if not folders:
+        if json_output:
+            emit_json([])
+            return
         console.print("[yellow]No workspaces found.[/yellow]")
         raise typer.Exit()
 
     # Sort newest-first for listing
     folders.sort(key=lambda bf: bf.oldest_modified, reverse=True)
+
+    if json_output and not cd:
+        emit_json([_folder_payload(bf) for bf in folders])
+        return
 
     if not cd:
         # Just print a table
@@ -79,13 +105,30 @@ def run_list(cfg: Config, cd: bool = False):
         label = f"{bf.name}  ({repo_count} {repo_label}, {dirty_str}, {age})"
         folder_map[label] = bf
 
-    selected_label = inquirer.fuzzy(
-        message="Select workspace:",
-        choices=list(folder_map.keys()),
-    ).execute()
+    if no_input:
+        if not workspace:
+            console.print("[bold red]Error:[/bold red] --no-input requires --workspace.")
+            raise typer.Exit(code=1)
+        name_to_bf = {bf.name: bf for bf in folders}
+        if workspace not in name_to_bf:
+            console.print(
+                f"[bold red]Error:[/bold red] workspace '{workspace}' not found. "
+                f"Valid: {', '.join(sorted(name_to_bf)) or '(none)'}"
+            )
+            raise typer.Exit(code=1)
+        bf = name_to_bf[workspace]
+    else:
+        selected_label = inquirer.fuzzy(
+            message="Select workspace:",
+            choices=list(folder_map.keys()),
+        ).execute()
 
-    if not selected_label:
-        raise typer.Exit()
+        if not selected_label:
+            raise typer.Exit()
 
-    bf = folder_map[selected_label]
+        bf = folder_map[selected_label]
+
     CD_PATH_FILE.write_text(str(bf.path))
+    if no_input:
+        from .io import stdout_console
+        stdout_console.print(str(bf.path))

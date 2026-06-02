@@ -18,6 +18,7 @@ from .config import (
     load_config,
     save_config,
 )
+# detect_scan_dirs/save_config used by _ensure_config for non-interactive setup
 
 app = typer.Typer(
     name="spawnpoint",
@@ -28,8 +29,17 @@ console = Console()
 
 
 def _ensure_config() -> Config:
-    """Load config, triggering init if none exists."""
+    """Load config, triggering init if none exists.
+
+    In non-interactive mode (--no-input/--json), skip the interactive setup and
+    write a config from detected defaults so agents/scripts never hang on a prompt.
+    """
     if not config_exists():
+        if {"--no-input", "-n", "--json"}.intersection(sys.argv[1:]):
+            cfg = Config()
+            cfg.scan_dirs = detect_scan_dirs()
+            save_config(cfg)
+            return cfg
         console.print("[bold]Welcome to Spawnpoint![/bold] Let's set things up.\n")
         _run_init()
     return load_config()
@@ -200,37 +210,87 @@ def _offer_shell_integration():
 @app.command()
 def create(
     yes: bool = typer.Option(False, "--yes", "-y", help="Auto-select default base branch when creating new branches"),
+    no_input: bool = typer.Option(False, "--no-input", "-n", help="Non-interactive mode for agents/scripts (requires flags below)"),
+    repos: str = typer.Option(None, "--repos", help="Comma-separated repo names to select (non-interactive)"),
+    branch: str = typer.Option(None, "--branch", "-b", help="Branch name (non-interactive)"),
+    base: str = typer.Option(None, "--base", help="Base branch for new branches (defaults to detected default)"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
 ):
     """Select repos and spawn worktree workspaces for a feature branch."""
     from .create import run_create
     cfg = _ensure_config()
-    run_create(cfg, yes=yes)
+    run_create(cfg, yes=yes, no_input=no_input, repos_arg=repos, branch=branch, base=base, json_output=json_output)
 
 
 @app.command()
-def add():
+def add(
+    no_input: bool = typer.Option(False, "--no-input", "-n", help="Non-interactive mode for agents/scripts"),
+    repos: str = typer.Option(None, "--repos", help="Comma-separated repo names to add (non-interactive)"),
+    base: str = typer.Option(None, "--base", help="Base branch for new branches (defaults to detected default)"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
+):
     """Add repos to an existing workspace (run from inside a workspace)."""
     from .add import run_add
     cfg = _ensure_config()
-    run_add(cfg)
+    run_add(cfg, no_input=no_input, repos_arg=repos, base=base, json_output=json_output)
 
 
 @app.command(name="list")
 def list_cmd(
     cd: bool = typer.Option(False, "--cd", "-c", help="Interactively select a workspace to cd into"),
+    no_input: bool = typer.Option(False, "--no-input", "-n", help="Non-interactive mode (with --cd, requires --workspace)"),
+    workspace: str = typer.Option(None, "--workspace", help="Workspace name to cd into (non-interactive --cd)"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
 ):
     """List all worktree workspaces."""
     from .list import run_list
     cfg = _ensure_config()
-    run_list(cfg, cd=cd)
+    run_list(cfg, cd=cd, no_input=no_input, workspace=workspace, json_output=json_output)
 
 
 @app.command()
-def cleanup():
+def repos(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
+):
+    """List repositories available to select (feeds create/add --repos)."""
+    from rich.table import Table
+
+    from .utils import find_git_repos, make_display_path
+    cfg = _ensure_config()
+    valid_dirs = [d for d in cfg.scan_dirs if d.is_dir()]
+    if not valid_dirs:
+        console.print("[bold red]Error:[/bold red] No scan directories configured. Run [bold]spawnpoint init[/bold].")
+        raise typer.Exit(code=1)
+
+    found = find_git_repos(valid_dirs, cfg.scan_depth)
+    if json_output:
+        from .io import emit_json
+        emit_json([{"name": make_display_path(r, valid_dirs), "path": str(r)} for r in found])
+        return
+
+    if not found:
+        console.print("[yellow]No git repositories found.[/yellow]")
+        return
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Name")
+    table.add_column("Path")
+    for r in found:
+        table.add_row(make_display_path(r, valid_dirs), str(r))
+    console.print(table)
+
+
+@app.command()
+def cleanup(
+    no_input: bool = typer.Option(False, "--no-input", "-n", help="Non-interactive mode for agents/scripts"),
+    workspaces: str = typer.Option(None, "--workspaces", help="Comma-separated workspace names to remove (non-interactive)"),
+    delete_branches: bool = typer.Option(None, "--delete-branches/--keep-branches", help="Whether to delete branches (non-interactive)"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
+):
     """Select and remove worktree workspaces."""
     from .cleanup import run_cleanup
     cfg = _ensure_config()
-    run_cleanup(cfg)
+    run_cleanup(cfg, no_input=no_input, workspaces=workspaces, delete_branches=delete_branches, json_output=json_output)
 
 
 @app.command()
