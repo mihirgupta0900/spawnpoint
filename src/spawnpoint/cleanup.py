@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.progress import track
 
 from .config import Config
+from .io import emit_json, parse_csv, resolve_names
 from .log import logger
 
 console = Console()
@@ -169,13 +170,14 @@ def _format_choice(bf: BranchFolder) -> str:
     return f"{bf.name}  ({repo_count} {repo_label}, {dirty_str}, {age})"
 
 
-def _remove_worktree(wt: WorktreeInfo, delete_branch: bool):
+def _remove_worktree(wt: WorktreeInfo, delete_branch: bool) -> bool:
+    """Remove a worktree (and optionally its branch). Returns True if branch deleted."""
     parent = wt.parent_repo_path
 
     if parent is None or not parent.exists():
         console.print(f"  [yellow]Parent repo gone, removing directory: {wt.worktree_path}[/yellow]")
         shutil.rmtree(wt.worktree_path, ignore_errors=True)
-        return
+        return False
 
     cmd = ["git", "worktree", "remove", str(wt.worktree_path)]
     if wt.is_dirty:
@@ -199,19 +201,30 @@ def _remove_worktree(wt: WorktreeInfo, delete_branch: bool):
             ["git", "branch", "-d", wt.branch_name],
             cwd=parent, capture_output=True, text=True,
         )
-        if result.returncode != 0:
-            err = result.stderr.strip()
-            if "not fully merged" in err:
-                console.print(f"  [yellow]Branch '{wt.branch_name}' not merged, force-deleting[/yellow]")
-                subprocess.run(
-                    ["git", "branch", "-D", wt.branch_name],
-                    cwd=parent, capture_output=True, text=True,
-                )
-            elif "not found" not in err:
-                console.print(f"  [dim]Branch delete skipped: {err}[/dim]")
+        if result.returncode == 0:
+            return True
+        err = result.stderr.strip()
+        if "not fully merged" in err:
+            console.print(f"  [yellow]Branch '{wt.branch_name}' not merged, force-deleting[/yellow]")
+            forced = subprocess.run(
+                ["git", "branch", "-D", wt.branch_name],
+                cwd=parent, capture_output=True, text=True,
+            )
+            return forced.returncode == 0
+        elif "not found" not in err:
+            console.print(f"  [dim]Branch delete skipped: {err}[/dim]")
+
+    return False
 
 
-def run_cleanup(cfg: Config):
+def run_cleanup(
+    cfg: Config,
+    *,
+    no_input: bool = False,
+    workspaces: str | None = None,
+    delete_branches: bool | None = None,
+    json_output: bool = False,
+):
     """Remove worktree workspaces."""
     work_dirs = [cfg.worktree_dir] + [
         d for d in cfg.additional_worktree_dirs if d != cfg.worktree_dir
@@ -244,22 +257,36 @@ def run_cleanup(cfg: Config):
 
     folder_map = {_format_choice(bf): bf for bf in folders}
 
-    selected_labels = inquirer.fuzzy(
-        message="Select workspaces to remove (type to search):",
-        choices=list(folder_map.keys()),
-        multiselect=True,
-    ).execute()
+    if no_input:
+        if not workspaces:
+            console.print("[bold red]Error:[/bold red] --no-input requires --workspaces.")
+            raise typer.Exit(code=1)
+        name_to_bf = {bf.name: bf for bf in folders}
+        requested = parse_csv(workspaces)
+        selected = resolve_names(requested, name_to_bf, kind="workspace", err=console)
+        if delete_branches is None:
+            console.print(
+                "[bold red]Error:[/bold red] --no-input requires --delete-branches or --keep-branches."
+            )
+            raise typer.Exit(code=1)
+        branch_pref = "Delete all branches" if delete_branches else "Keep branches"
+    else:
+        selected_labels = inquirer.fuzzy(
+            message="Select workspaces to remove (type to search):",
+            choices=list(folder_map.keys()),
+            multiselect=True,
+        ).execute()
 
-    if not selected_labels:
-        console.print("No workspaces selected. Exiting.")
-        raise typer.Exit()
+        if not selected_labels:
+            console.print("No workspaces selected. Exiting.")
+            raise typer.Exit()
 
-    selected = [folder_map[label] for label in selected_labels]
+        selected = [folder_map[label] for label in selected_labels]
 
-    branch_pref = inquirer.select(
-        message="Delete branches from parent repos?",
-        choices=["Delete all branches", "Keep branches", "Ask per branch"],
-    ).execute()
+        branch_pref = inquirer.select(
+            message="Delete branches from parent repos?",
+            choices=["Delete all branches", "Keep branches", "Ask per branch"],
+        ).execute()
 
     # Show plan
     console.print(f"\n[bold]Plan:[/bold]")
@@ -275,15 +302,17 @@ def run_cleanup(cfg: Config):
                 console.print(f"    {parent_label}: [dim]will ask about '{wt.branch_name}'[/dim]")
 
     console.print("")
-    if not inquirer.confirm(message="Proceed with cleanup?").execute():
+    if not no_input and not inquirer.confirm(message="Proceed with cleanup?").execute():
         console.print("Aborted.")
         raise typer.Exit()
 
     # Execute
     parent_repos_seen: set[Path] = set()
+    removed_report: List[dict] = []
 
     for bf in track(selected, description="Cleaning up..."):
         branch_decisions: dict[str, bool] = {}
+        wt_report: List[dict] = []
 
         for wt in bf.worktrees:
             delete_branch = False
@@ -298,7 +327,12 @@ def run_cleanup(cfg: Config):
                     ).execute()
                 delete_branch = branch_decisions[key]
 
-            _remove_worktree(wt, delete_branch)
+            branch_deleted = _remove_worktree(wt, delete_branch)
+            wt_report.append({
+                "repo": wt.parent_repo_path.name if wt.parent_repo_path else "unknown",
+                "branch": wt.branch_name,
+                "branch_deleted": branch_deleted,
+            })
 
             if wt.parent_repo_path and wt.parent_repo_path.exists():
                 parent_repos_seen.add(wt.parent_repo_path)
@@ -307,8 +341,13 @@ def run_cleanup(cfg: Config):
         if bf.path.exists():
             shutil.rmtree(bf.path, ignore_errors=True)
 
+        removed_report.append({"workspace": bf.name, "worktrees": wt_report})
+
     # Prune all affected parent repos
     for repo in parent_repos_seen:
         subprocess.run(["git", "worktree", "prune"], cwd=repo, capture_output=True)
 
     console.print("\n[bold green]Done![/bold green]")
+
+    if json_output:
+        emit_json({"removed": removed_report})

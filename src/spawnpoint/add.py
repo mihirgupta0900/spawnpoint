@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.progress import track
 
 from .config import Config
+from .io import emit_json, parse_csv, require, resolve_names
 from .log import logger
 from .utils import (
     copy_essential_files,
@@ -123,7 +124,25 @@ def _existing_repo_names(workspace_dir: Path) -> set[str]:
     return names
 
 
-def run_add(cfg: Config):
+def _resolve_repos(requested, choice_to_path):
+    """Resolve a CSV repo arg against available repos by display label or dir name."""
+    name_to_value = dict(choice_to_path)
+    aliases: dict[str, list[str]] = {}
+    for label, path in choice_to_path.items():
+        aliases.setdefault(path.name, []).append(label)
+    return resolve_names(
+        requested, name_to_value, kind="repo", err=console, aliases=aliases
+    )
+
+
+def run_add(
+    cfg: Config,
+    *,
+    no_input: bool = False,
+    repos_arg: str | None = None,
+    base: str | None = None,
+    json_output: bool = False,
+):
     """Add repos to an existing spawnpoint workspace."""
     detected = _detect_workspace(cfg)
 
@@ -162,17 +181,21 @@ def run_add(cfg: Config):
     choices = [make_display_path(repo, valid_dirs) for repo in repos]
     choice_to_path = dict(zip(choices, repos))
 
-    selected_labels = ClearOnToggleFuzzyPrompt(
-        message="Select repositories to add (type to search):",
-        choices=choices,
-        multiselect=True,
-    ).execute()
+    if no_input:
+        requested = parse_csv(require(repos_arg, "--repos", console))
+        selected_repos = _resolve_repos(requested, choice_to_path)
+    else:
+        selected_labels = ClearOnToggleFuzzyPrompt(
+            message="Select repositories to add (type to search):",
+            choices=choices,
+            multiselect=True,
+        ).execute()
 
-    if not selected_labels:
-        console.print("No repositories selected. Exiting.")
-        raise typer.Exit()
+        if not selected_labels:
+            console.print("No repositories selected. Exiting.")
+            raise typer.Exit()
 
-    selected_repos = [choice_to_path[label] for label in selected_labels]
+        selected_repos = [choice_to_path[label] for label in selected_labels]
 
     # If existing workspace was single-repo, we need to restructure it to multi-repo
     needs_restructure = (workspace_dir / ".git").is_file()
@@ -223,7 +246,16 @@ def run_add(cfg: Config):
             })
         else:
             detected_default = detect_default_branch(repo_path)
-            if detected_default:
+            if no_input:
+                base_branch = base or detected_default
+                if not base_branch:
+                    console.print(
+                        f"[bold red]Error:[/bold red] [{repo_name}] branch '{branch_name}' "
+                        f"not found and no default branch detected. Pass --base."
+                    )
+                    raise typer.Exit(code=1)
+                console.print(f"  [dim]{repo_name}: creating from {base_branch}[/dim]")
+            elif detected_default:
                 choices_list = [detected_default, "Other (manual input)"]
                 base_branch = inquirer.select(
                     message=f"[{repo_name}] Branch '{branch_name}' not found. Create from:",
@@ -262,7 +294,7 @@ def run_add(cfg: Config):
         else:
             console.print(f"  {action['repo_name']}: [blue]create branch[/blue] '{action['branch']}' from '{action['base']}'")
 
-    if not inquirer.confirm(message="Proceed?", default=True).execute():
+    if not no_input and not inquirer.confirm(message="Proceed?", default=True).execute():
         console.print("Aborted.")
         raise typer.Exit()
 
@@ -275,6 +307,7 @@ def run_add(cfg: Config):
         repo_name = action["repo_name"]
         repo_path = action["repo_path"]
         target_path = action["target_path"]
+        action["status"] = "failed"
 
         console.print(f"Processing [bold]{repo_name}[/bold]...")
 
@@ -310,6 +343,7 @@ def run_add(cfg: Config):
                     console.print(f"  [red]Failed:[/red] {result.stderr.strip()}")
 
             if success:
+                action["status"] = "added"
                 console.print(f"  [dim]Initializing submodules...[/dim]")
                 subprocess.run(
                     ["git", "submodule", "update", "--init", "--recursive"],
@@ -325,6 +359,22 @@ def run_add(cfg: Config):
 
     console.print(f"\n[bold green]Done![/bold green]")
     console.print(f"Workspace: [bold blue]{workspace_dir}[/bold blue]")
+
+    if json_output:
+        emit_json({
+            "workspace": str(workspace_dir),
+            "branch": branch_name,
+            "added": [
+                {
+                    "name": a["repo_name"],
+                    "branch": a["branch"],
+                    "base": a.get("base"),
+                    "action": a["type"],
+                    "status": a.get("status", "failed"),
+                }
+                for a in repo_actions
+            ],
+        })
 
 
 def _restructure_to_multi_repo(workspace_dir: Path):

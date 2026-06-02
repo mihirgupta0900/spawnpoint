@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.progress import track
 
 from .config import CD_PATH_FILE, Config
+from .io import emit_json, parse_csv, require, resolve_names
 from .log import logger
 from .utils import (
     copy_essential_files,
@@ -43,7 +44,27 @@ class ClearOnToggleFuzzyPrompt(FuzzyPrompt):
         return display
 
 
-def run_create(cfg: Config, yes: bool = False):
+def _resolve_repos(requested, choice_to_path):
+    """Resolve a CSV repo arg against available repos by display label or dir name."""
+    name_to_value = dict(choice_to_path)
+    aliases: dict[str, list[str]] = {}
+    for label, path in choice_to_path.items():
+        aliases.setdefault(path.name, []).append(label)
+    return resolve_names(
+        requested, name_to_value, kind="repo", err=console, aliases=aliases
+    )
+
+
+def run_create(
+    cfg: Config,
+    yes: bool = False,
+    *,
+    no_input: bool = False,
+    repos_arg: str | None = None,
+    branch: str | None = None,
+    base: str | None = None,
+    json_output: bool = False,
+):
     """Select git repos and create worktrees for a feature branch."""
     if not cfg.scan_dirs:
         console.print("[bold red]Error:[/bold red] No scan directories configured.")
@@ -74,22 +95,29 @@ def run_create(cfg: Config, yes: bool = False):
     choices = [make_display_path(repo, valid_dirs) for repo in repos]
     choice_to_path = dict(zip(choices, repos))
 
-    selected_labels = ClearOnToggleFuzzyPrompt(
-        message="Select repositories (type to search):",
-        choices=choices,
-        multiselect=True,
-    ).execute()
+    if no_input:
+        requested = parse_csv(require(repos_arg, "--repos", console))
+        selected_repos = _resolve_repos(requested, choice_to_path)
+    else:
+        selected_labels = ClearOnToggleFuzzyPrompt(
+            message="Select repositories (type to search):",
+            choices=choices,
+            multiselect=True,
+        ).execute()
 
-    if not selected_labels:
-        console.print("No repositories selected. Exiting.")
-        raise typer.Exit()
+        if not selected_labels:
+            console.print("No repositories selected. Exiting.")
+            raise typer.Exit()
 
-    selected_repos = [choice_to_path[label] for label in selected_labels]
+        selected_repos = [choice_to_path[label] for label in selected_labels]
 
-    branch_name = inquirer.text(message="Enter the branch name:").execute()
-    if not branch_name:
-        console.print("Branch name cannot be empty.")
-        raise typer.Exit(code=1)
+    if no_input:
+        branch_name = require(branch, "--branch", console)
+    else:
+        branch_name = inquirer.text(message="Enter the branch name:").execute()
+        if not branch_name:
+            console.print("Branch name cannot be empty.")
+            raise typer.Exit(code=1)
 
     # Phase 1: Fetch & prune
     console.print(f"\n[bold blue]Preparing repositories...[/bold blue]")
@@ -149,7 +177,16 @@ def run_create(cfg: Config, yes: bool = False):
         else:
             # Branch needs creation — detect default branch
             detected = detect_default_branch(repo_path)
-            if yes and detected:
+            if no_input:
+                base_branch = base or detected
+                if not base_branch:
+                    console.print(
+                        f"[bold red]Error:[/bold red] [{repo_name}] branch '{branch_name}' "
+                        f"not found and no default branch detected. Pass --base."
+                    )
+                    raise typer.Exit(code=1)
+                console.print(f"  [dim]{repo_name}: creating from {base_branch}[/dim]")
+            elif yes and detected:
                 base_branch = detected
                 console.print(f"  [dim]{repo_name}: creating from {detected}[/dim]")
             elif detected:
@@ -187,7 +224,7 @@ def run_create(cfg: Config, yes: bool = False):
         else:
             console.print(f"  {action['repo_name']}: [blue]create branch[/blue] '{action['branch']}' from '{action['base']}'")
 
-    if not inquirer.confirm(message="Proceed?", default=True).execute():
+    if not no_input and not inquirer.confirm(message="Proceed?", default=True).execute():
         console.print("Aborted.")
         raise typer.Exit()
 
@@ -196,6 +233,7 @@ def run_create(cfg: Config, yes: bool = False):
         repo_name = action["repo_name"]
         repo_path = action["repo_path"]
         target_path = action["target_path"]
+        action["status"] = "failed"
 
         console.print(f"Processing [bold]{repo_name}[/bold]...")
 
@@ -231,6 +269,7 @@ def run_create(cfg: Config, yes: bool = False):
                     console.print(f"  [red]Failed:[/red] {result.stderr.strip()}")
 
             if success:
+                action["status"] = "created"
                 # Init submodules
                 console.print(f"  [dim]Initializing submodules...[/dim]")
                 subprocess.run(
@@ -255,3 +294,25 @@ def run_create(cfg: Config, yes: bool = False):
 
     console.print(f"Workspace: [bold blue]{workspace_path}[/bold blue]")
     CD_PATH_FILE.write_text(str(workspace_path))
+
+    if json_output:
+        emit_json({
+            "workspace": str(workspace_path),
+            "branch": branch_name,
+            "repos": [
+                {
+                    "name": a["repo_name"],
+                    "branch": a["branch"],
+                    "base": a.get("base"),
+                    "action": a["type"],
+                    "status": a.get("status", "failed"),
+                }
+                for a in repo_actions
+            ],
+        })
+
+    elif no_input:
+        # Plain stdout so agents can capture the workspace path via $(...).
+        # Skipped when --json is set so stdout stays valid JSON.
+        from .io import stdout_console
+        stdout_console.print(str(workspace_path))

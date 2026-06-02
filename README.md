@@ -10,6 +10,14 @@ Working on a feature that spans multiple repos? Spawnpoint creates a dedicated f
 
 ## Install
 
+### macOS app
+
+Download the latest `.dmg` from [Releases](https://github.com/mihirgupta0900/spawnpoint/releases?q=mac) and drag Spawnpoint into Applications. Lives in your menu bar — no terminal required.
+
+Source: [`mac/`](./mac).
+
+### CLI
+
 ```
 pipx install spawnpoint
 ```
@@ -54,6 +62,7 @@ All worktrees land in a single folder (`~/.spawnpoint/workspaces/<branch-name>/`
 | `sp create -y` | Auto-select default base branches |
 | `sp list` | List all workspaces |
 | `sp list --cd` | Interactively select a workspace to cd into |
+| `sp repos` | List repositories available to select |
 | `sp add` | Add repos to the current workspace |
 | `sp cleanup` | Remove worktree workspaces |
 | `sp init` | Run interactive setup |
@@ -82,6 +91,58 @@ sp list
 Shows a table of all workspaces with repo count, branch, dirty status, and age.
 
 Use `sp list --cd` (or `sp list` with shell integration) to interactively pick a workspace and cd into it.
+
+## Non-Interactive Mode (for agents & scripts)
+
+Every interactive command can run fully non-interactively with `--no-input` (`-n`), so coding agents and scripts can drive Spawnpoint without prompts. In this mode, every selection must be supplied via flags — a missing required flag exits non-zero with a clear error instead of hanging.
+
+Add `--json` to any command for machine-readable output on stdout (human-readable text stays on stderr).
+
+### Discover what's available
+
+```sh
+sp repos --json    # repos you can pass to --repos
+sp list --json     # existing workspaces (names usable as --workspaces / --workspace)
+```
+
+### Create a workspace
+
+```sh
+sp create --no-input --repos api,web --branch feat-x --base main --json
+```
+
+- `--repos` — comma-separated repo names (match the names from `sp repos`).
+- `--branch` — branch name (required).
+- `--base` — base branch for branches that don't exist yet. Optional; defaults to each repo's detected default branch. Required only if no default can be detected.
+
+On success it prints the workspace path to stdout (capture with `$(...)`), or full JSON with `--json`.
+
+### Add repos to the current workspace
+
+Run from inside a workspace:
+
+```sh
+sp add --no-input --repos api --base main --json
+```
+
+### Remove workspaces
+
+```sh
+sp cleanup --no-input --workspaces feat-x,bug-y --delete-branches --json
+```
+
+- `--workspaces` — comma-separated workspace names (from `sp list`).
+- `--delete-branches` / `--keep-branches` — required; whether to delete the branches from parent repos.
+
+### cd into a workspace
+
+```sh
+sp list --cd --no-input --workspace feat-x
+```
+
+Prints the workspace path to stdout (and writes the cd-path file used by shell integration).
+
+> If no config exists yet, non-interactive commands auto-create one from detected defaults instead of prompting.
 
 ## Configuration
 
