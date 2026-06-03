@@ -144,6 +144,16 @@ Prints the workspace path to stdout (and writes the cd-path file used by shell i
 
 > If no config exists yet, non-interactive commands auto-create one from detected defaults instead of prompting.
 
+### Agent skill
+
+A bundled [Claude Code / agent skill](skills/spawnpoint/SKILL.md) teaches agents to drive Spawnpoint non-interactively. Install it via [skills.sh](https://www.skills.sh):
+
+```sh
+npx skills add mihirgupta0900/spawnpoint
+```
+
+This adds the `spawnpoint` skill so agents automatically know to use `--no-input --json` and the correct flags for each command.
+
 ## Configuration
 
 Config lives at `~/.spawnpoint/config.toml`:
