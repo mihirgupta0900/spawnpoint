@@ -293,6 +293,19 @@ def cleanup(
     run_cleanup(cfg, no_input=no_input, workspaces=workspaces, delete_branches=delete_branches, json_output=json_output)
 
 
+@app.command(name="light-cleanup")
+def light_cleanup(
+    no_input: bool = typer.Option(False, "--no-input", "-n", help="Non-interactive mode for agents/scripts"),
+    workspaces: str = typer.Option(None, "--workspaces", help="Comma-separated workspace names (non-interactive)"),
+    artifact_types: str = typer.Option(None, "--artifact-types", help="Comma-separated artifact type names to delete, e.g. node_modules,.venv (non-interactive; default: all found)"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
+):
+    """Delete reinstallable artifact dirs (node_modules, .venv, etc.) to free space without losing code."""
+    from .light_cleanup import run_light_cleanup
+    cfg = _ensure_config()
+    run_light_cleanup(cfg, no_input=no_input, workspaces=workspaces, artifact_types=artifact_types, json_output=json_output)
+
+
 @app.command()
 def init():
     """Run interactive setup (creates or overwrites config)."""

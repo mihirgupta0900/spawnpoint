@@ -37,7 +37,8 @@ sp create     # select repos, name a branch, spawn worktrees
 sp create -y  # auto-select default base branches (skip base branch prompts)
 sp list       # view all workspaces
 sp add        # add repos to the current workspace
-sp cleanup    # select and remove worktree workspaces
+sp cleanup        # select and remove worktree workspaces
+sp light-cleanup  # free space by deleting node_modules, .venv, etc. (keeps code)
 ```
 
 On first run, Spawnpoint will ask you to configure your scan directories and workspace location.
@@ -65,6 +66,7 @@ All worktrees land in a single folder (`~/.spawnpoint/workspaces/<branch-name>/`
 | `sp repos` | List repositories available to select |
 | `sp add` | Add repos to the current workspace |
 | `sp cleanup` | Remove worktree workspaces |
+| `sp light-cleanup` | Free space by deleting reinstallable dirs (node_modules, .venv, etc.) |
 | `sp init` | Run interactive setup |
 | `sp config` | View current config |
 | `sp config --edit` | Edit config in $EDITOR |
@@ -133,6 +135,25 @@ sp cleanup --no-input --workspaces feat-x,bug-y --delete-branches --json
 
 - `--workspaces` — comma-separated workspace names (from `sp list`).
 - `--delete-branches` / `--keep-branches` — required; whether to delete the branches from parent repos.
+
+### Free space without deleting code (light cleanup)
+
+```sh
+sp light-cleanup
+```
+
+Scans selected workspaces for reinstallable artifact directories (`node_modules`, `.venv`, `venv`, `__pycache__`, `.next`, `target`, etc.), shows sizes, lets you pick which types to delete, and removes them. Your code is untouched.
+
+Non-interactive:
+
+```sh
+sp light-cleanup --no-input --workspaces feat-x,bug-y --json
+# delete only specific artifact types:
+sp light-cleanup --no-input --workspaces feat-x --artifact-types node_modules,.venv --json
+```
+
+- `--workspaces` — comma-separated workspace names.
+- `--artifact-types` — comma-separated artifact dir names to delete (default: all found).
 
 ### cd into a workspace
 
