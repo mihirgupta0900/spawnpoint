@@ -32,6 +32,38 @@ from .utils import (
 console = Console(stderr=True)
 
 
+def _offer_save_template(selected_names: List[str], active_template) -> str | None:
+    """Offer to remember an interactively-picked repo set. Returns a name or None.
+
+    Skipped for a single repo (a template buys you little there) and when the
+    selection still matches the template it came from.
+    """
+    if len(selected_names) < 2:
+        return None
+    if active_template and set(selected_names) == set(active_template.repos):
+        return None
+
+    if not inquirer.confirm(
+        message=f"Save these {len(selected_names)} repos as a template for next time?",
+        default=False,
+    ).execute():
+        return None
+
+    name = (inquirer.text(message="Template name:").execute() or "").strip()
+    if not name:
+        console.print("[dim]No name given, template not saved.[/dim]")
+        return None
+
+    if name in load_templates() and not inquirer.confirm(
+        message=f"Template '{name}' already exists. Overwrite it?",
+        default=False,
+    ).execute():
+        console.print("[dim]Template not saved.[/dim]")
+        return None
+
+    return name
+
+
 def run_create(
     cfg: Config,
     yes: bool = False,
@@ -248,18 +280,19 @@ def run_create(
         raise typer.Exit()
 
     # Remember this repo set for next time.
+    selected_names = [make_display_path(p, valid_dirs) for p in selected_repos]
+    if not save_template and not no_input:
+        save_template = _offer_save_template(selected_names, active_template)
+
     if save_template:
         saved_path, existed = upsert_template(
-            merge_template(
-                save_template,
-                [make_display_path(p, valid_dirs) for p in selected_repos],
-                base=base,
-            )
+            merge_template(save_template, selected_names, base=base)
         )
         console.print(
             f"[green]{'Updated' if existed else 'Saved'} template "
             f"'{save_template}'[/green] [dim]({saved_path})[/dim]"
         )
+        console.print(f"[dim]Reuse it with: spawnpoint create -t {save_template}[/dim]")
 
     # Phase 3: Execute
     for action in track(repo_actions, description="Creating worktrees..."):

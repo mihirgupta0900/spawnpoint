@@ -119,15 +119,48 @@ sp create -t image-gen        # or --template image-gen
 
 A template stores the repo set, plus an optional base branch and description. `sp create` uses it as a starting point: the repo picker opens with those repos already selected, so you can still add or drop one for this workspace only. With `--no-input` the template's repos are used as-is.
 
-Run `sp create` with no flags and any saved templates are offered first, with "Pick repos manually" as the default — so nothing changes until you save one.
+### Picking a template in `sp create`
 
-Going the other way, save the repos you just picked:
+Run `sp create` with no flags and saved templates are offered first, ahead of the repo picker:
+
+```
+? Start from a template?
+❯ Pick repos manually
+  billing  (backend, dashboard)
+  image-gen  (Image generation stack)
+```
+
+"Pick repos manually" is the default and comes first, so pressing Enter gives you exactly the old behaviour — and the prompt doesn't appear at all until you save your first template. Templates are listed by name with their description, or their repos if they have none.
+
+Pick one and the repo picker opens with those repos already toggled on:
+
+```
+? Select repositories (type to search):
+❯   4/4 (3)  Selected: backend, chottu, daily-prophet
+❯❯backend
+ ❯chottu
+ ❯daily-prophet
+  dashboard
+```
+
+So a template is two keystrokes (arrow, Enter) and then Enter again to accept the set, or a few TABs to adjust it for this one workspace. Skip the prompt entirely with `sp create -t image-gen`.
+
+### Saving a template
+
+After you confirm the plan, `sp create` offers to remember the set:
+
+```
+? Save these 3 repos as a template for next time? (y/N)
+? Template name: image-gen
+```
+
+The default is No, and the offer is skipped when you picked a single repo or when the set still matches the template you started from. To name it up front instead:
 
 ```sh
 sp create --save-template image-gen
 ```
 
-That also works on an existing template, so `sp create -t image-gen --save-template image-gen` spawns the set, and folds in whatever you tweaked in the picker.
+That also works on an existing template, so `sp create -t image-gen --save-template image-gen` spawns the set and folds in whatever you tweaked in the picker.
 
 Templates live in `~/.spawnpoint/templates.toml` and are safe to edit or commit as a dotfile:
 
