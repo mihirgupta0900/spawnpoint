@@ -5,13 +5,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import typer
 from InquirerPy import inquirer
-from InquirerPy.prompts.fuzzy import FuzzyPrompt
 from rich.console import Console
 from rich.progress import track
 
 from .config import Config
-from .io import emit_json, parse_csv, require, resolve_names
+from .io import emit_json, parse_csv, require, resolve_repos
 from .log import logger
+from .prompts import select_repos
 from .utils import (
     copy_essential_files,
     detect_default_branch,
@@ -21,27 +21,6 @@ from .utils import (
 )
 
 console = Console(stderr=True)
-
-
-class ClearOnToggleFuzzyPrompt(FuzzyPrompt):
-    """FuzzyPrompt that clears search and shows selected repos on toggle."""
-
-    def _handle_toggle_choice(self, _) -> None:
-        super()._handle_toggle_choice(_)
-        self._buffer.reset()
-        # Reset filtered list to show all choices (not just previous search results)
-        for choice in self.content_control.choices:
-            choice["indices"] = []
-        self.content_control._filtered_choices = self.content_control.choices
-
-    def _generate_after_input(self):
-        display = super()._generate_after_input()
-        selected = self.selected_choices
-        if selected:
-            names = ", ".join(c["name"] for c in selected)
-            display.append(("", "  "))
-            display.append(("class:fuzzy_info", f"Selected: {names}"))
-        return display
 
 
 def _detect_workspace(cfg: Config) -> Optional[Tuple[Path, str]]:
@@ -124,17 +103,6 @@ def _existing_repo_names(workspace_dir: Path) -> set[str]:
     return names
 
 
-def _resolve_repos(requested, choice_to_path):
-    """Resolve a CSV repo arg against available repos by display label or dir name."""
-    name_to_value = dict(choice_to_path)
-    aliases: dict[str, list[str]] = {}
-    for label, path in choice_to_path.items():
-        aliases.setdefault(path.name, []).append(label)
-    return resolve_names(
-        requested, name_to_value, kind="repo", err=console, aliases=aliases
-    )
-
-
 def run_add(
     cfg: Config,
     *,
@@ -183,13 +151,12 @@ def run_add(
 
     if no_input:
         requested = parse_csv(require(repos_arg, "--repos", console))
-        selected_repos = _resolve_repos(requested, choice_to_path)
+        selected_repos = resolve_repos(requested, choice_to_path, err=console)
     else:
-        selected_labels = ClearOnToggleFuzzyPrompt(
-            message="Select repositories to add (type to search):",
-            choices=choices,
-            multiselect=True,
-        ).execute()
+        selected_labels = select_repos(
+            "Select repositories to add (type to search):",
+            choices,
+        )
 
         if not selected_labels:
             console.print("No repositories selected. Exiting.")
@@ -246,8 +213,12 @@ def run_add(
             })
         else:
             detected_default = detect_default_branch(repo_path)
-            if no_input:
-                base_branch = base or detected_default
+            if base:
+                # An explicit --base applies to every repo.
+                base_branch = base
+                console.print(f"  [dim]{repo_name}: creating from {base_branch}[/dim]")
+            elif no_input:
+                base_branch = detected_default
                 if not base_branch:
                     console.print(
                         f"[bold red]Error:[/bold red] [{repo_name}] branch '{branch_name}' "
