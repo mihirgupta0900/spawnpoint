@@ -39,6 +39,9 @@ sp list       # view all workspaces
 sp add        # add repos to the current workspace
 sp cleanup        # select and remove worktree workspaces
 sp light-cleanup  # free space by deleting node_modules, .venv, etc. (keeps code)
+
+sp template save image-gen   # remember a set of repos you spawn together
+sp create -t image-gen       # spawn that set again
 ```
 
 On first run, Spawnpoint will ask you to configure your scan directories and workspace location.
@@ -61,10 +64,15 @@ All worktrees land in a single folder (`~/.spawnpoint/workspaces/<branch-name>/`
 |---|---|
 | `sp create` | Spawn worktree workspaces |
 | `sp create -y` | Auto-select default base branches |
+| `sp create -t <name>` | Spawn from a saved template |
 | `sp list` | List all workspaces |
 | `sp list --cd` | Interactively select a workspace to cd into |
 | `sp repos` | List repositories available to select |
 | `sp add` | Add repos to the current workspace |
+| `sp template list` | List saved templates |
+| `sp template save <name>` | Create or update a template |
+| `sp template show <name>` | Show one template |
+| `sp template delete <name>` | Delete a template |
 | `sp cleanup` | Remove worktree workspaces |
 | `sp light-cleanup` | Free space by deleting reinstallable dirs (node_modules, .venv, etc.) |
 | `sp init` | Run interactive setup |
@@ -94,6 +102,44 @@ Shows a table of all workspaces with repo count, branch, dirty status, and age.
 
 Use `sp list --cd` (or `sp list` with shell integration) to interactively pick a workspace and cd into it.
 
+## Templates
+
+If the same repos keep coming up together — an image generation stack, a billing surface — save them once as a template and spawn them by name:
+
+```sh
+sp template save image-gen                      # pick repos interactively
+sp template save image-gen --repos chottu,backend,daily-prophet --base staging
+```
+
+Then use it:
+
+```sh
+sp create -t image-gen        # or --template image-gen
+```
+
+A template stores the repo set, plus an optional base branch and description. `sp create` uses it as a starting point: the repo picker opens with those repos already selected, so you can still add or drop one for this workspace only. With `--no-input` the template's repos are used as-is.
+
+Run `sp create` with no flags and any saved templates are offered first, with "Pick repos manually" as the default — so nothing changes until you save one.
+
+Going the other way, save the repos you just picked:
+
+```sh
+sp create --save-template image-gen
+```
+
+That also works on an existing template, so `sp create -t image-gen --save-template image-gen` spawns the set, and folds in whatever you tweaked in the picker.
+
+Templates live in `~/.spawnpoint/templates.toml` and are safe to edit or commit as a dotfile:
+
+```toml
+[templates."image-gen"]
+description = "Image generation stack"
+repos = ["chottu", "backend", "daily-prophet"]
+base = "staging"
+```
+
+Repo names must match the names from `sp repos`. Deleting a template never touches workspaces you already spawned.
+
 ## Non-Interactive Mode (for agents & scripts)
 
 Every interactive command can run fully non-interactively with `--no-input` (`-n`), so coding agents and scripts can drive Spawnpoint without prompts. In this mode, every selection must be supplied via flags — a missing required flag exits non-zero with a clear error instead of hanging.
@@ -103,21 +149,35 @@ Add `--json` to any command for machine-readable output on stdout (human-readabl
 ### Discover what's available
 
 ```sh
-sp repos --json    # repos you can pass to --repos
-sp list --json     # existing workspaces (names usable as --workspaces / --workspace)
+sp repos --json           # repos you can pass to --repos
+sp list --json            # existing workspaces (names usable as --workspaces / --workspace)
+sp template list --json   # templates you can pass to --template
 ```
 
 ### Create a workspace
 
 ```sh
 sp create --no-input --repos api,web --branch feat-x --base main --json
+sp create --no-input --template image-gen --branch feat-x --json
 ```
 
-- `--repos` — comma-separated repo names (match the names from `sp repos`).
+- `--repos` — comma-separated repo names (match the names from `sp repos`). Required unless `--template` is given.
+- `--template` / `-t` — take the repo set from a saved template. An explicit `--repos` overrides it.
 - `--branch` — branch name (required).
-- `--base` — base branch for branches that don't exist yet. Optional; defaults to each repo's detected default branch. Required only if no default can be detected.
+- `--base` — base branch for branches that don't exist yet. Optional; defaults to the template's base, then to each repo's detected default branch. Required only if no default can be detected.
 
 On success it prints the workspace path to stdout (capture with `$(...)`), or full JSON with `--json`.
+
+### Manage templates
+
+```sh
+sp template save image-gen --no-input --repos api,web --base main --json
+sp template show image-gen --json
+sp template delete image-gen --no-input --json
+```
+
+- `template save` requires `--repos` in `--no-input`; `--base` and `--description` are optional and keep their saved values when omitted.
+- A template naming a repo that no longer exists is an error in `--no-input`; interactively it is a warning and the remaining repos are pre-selected.
 
 ### Add repos to the current workspace
 
@@ -203,6 +263,8 @@ auto_install_deps = true
 # Check for new versions on startup
 check_updates = true
 ```
+
+Templates are stored separately in `~/.spawnpoint/templates.toml`, so `sp init` and `sp config --reset` leave them alone. See [Templates](#templates).
 
 ### Additional worktree dirs
 

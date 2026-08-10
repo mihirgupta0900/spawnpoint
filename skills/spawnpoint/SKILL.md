@@ -1,6 +1,6 @@
 ---
 name: spawnpoint
-description: This skill should be used when an agent needs to create, list, extend, or remove multi-repo git worktree workspaces using the spawnpoint CLI (binary `spawnpoint`, shell wrapper `sp`). Use it when a task involves spinning up isolated worktrees for a feature branch across one or more repos, finding existing workspaces, adding repos to the current workspace, or cleaning up worktrees. Always invoke spawnpoint in non-interactive mode with `--no-input --json` so commands never block on a TTY prompt.
+description: This skill should be used when an agent needs to create, list, extend, or remove multi-repo git worktree workspaces using the spawnpoint CLI (binary `spawnpoint`, shell wrapper `sp`). Use it when a task involves spinning up isolated worktrees for a feature branch across one or more repos, finding existing workspaces, adding repos to the current workspace, reusing a saved repo template, or cleaning up worktrees. Always invoke spawnpoint in non-interactive mode with `--no-input --json` so commands never block on a TTY prompt.
 ---
 
 # Spawnpoint (agent usage)
@@ -35,9 +35,11 @@ agent. Always:
    ```bash
    spawnpoint create --no-input --json --repos "api,web" --branch "feat/login" [--base main]
    ```
-   - `--repos` comma-separated repo names from step 1 (required).
+   - `--repos` comma-separated repo names from step 1 (required unless `--template` is given).
    - `--branch` / `-b` feature branch name (required).
-   - `--base` base branch for newly-created branches; omit to use each repo's detected default.
+   - `--base` base branch for newly-created branches; omit to use the template's base, then each repo's detected default.
+   - `--template` / `-t` take the repo set from a saved template (see step 6). An explicit `--repos` overrides it.
+   - `--save-template <name>` also save the selected repos as a template for reuse.
    - `-y` / `--yes` auto-selects the default base without `--base` (single-repo convenience).
    Returns the new `workspace` path and per-repo `status`. `cd` into `workspace` for follow-up work.
 
@@ -62,6 +64,21 @@ agent. Always:
    Returns a `removed` report. This is destructive; only run with explicit user intent and
    confirm the target names against `spawnpoint list --json` first.
 
+6. **Templates** — named repo sets the user spawns together, so recurring work needs one flag
+   instead of a repo list:
+   ```bash
+   spawnpoint template list --json                    # discover names for --template
+   spawnpoint template show "image-gen" --json
+   spawnpoint template save "image-gen" --no-input --json --repos "api,web" [--base main] [--description "..."]
+   spawnpoint template delete "image-gen" --no-input --json
+   ```
+   - `template save` requires `--repos` in `--no-input`; it creates or updates in place, keeping
+     the saved `--base`/`--description` when those flags are omitted.
+   - If `create --template` fails with an unknown repo, the template is stale — report it to the
+     user, or fix it with `template save <name> --repos ...` if they say which repos it should have.
+   - Prefer an existing template over guessing a repo list when the user names a kind of work
+     ("image gen work") that matches one.
+
 ## Output handling
 
 - With `--json`, stdout is a single JSON document — parse it; do not also pass non-JSON flags
@@ -74,4 +91,4 @@ agent. Always:
 ## Reference
 
 See `references/json_schemas.md` for exact JSON output shapes of `repos`, `create`, `add`,
-`list`, and `cleanup`, plus the full flag matrix.
+`list`, `cleanup`, and `template`, plus the full flag matrix.

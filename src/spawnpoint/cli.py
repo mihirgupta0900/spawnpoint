@@ -214,12 +214,24 @@ def create(
     repos: str = typer.Option(None, "--repos", help="Comma-separated repo names to select (non-interactive)"),
     branch: str = typer.Option(None, "--branch", "-b", help="Branch name (non-interactive)"),
     base: str = typer.Option(None, "--base", help="Base branch for new branches (defaults to detected default)"),
+    template: str = typer.Option(None, "--template", "-t", help="Start from a saved template's repo set"),
+    save_template: str = typer.Option(None, "--save-template", help="Save the selected repos as a template under this name"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
 ):
     """Select repos and spawn worktree workspaces for a feature branch."""
     from .create import run_create
     cfg = _ensure_config()
-    run_create(cfg, yes=yes, no_input=no_input, repos_arg=repos, branch=branch, base=base, json_output=json_output)
+    run_create(
+        cfg,
+        yes=yes,
+        no_input=no_input,
+        repos_arg=repos,
+        branch=branch,
+        base=base,
+        template=template,
+        save_template=save_template,
+        json_output=json_output,
+    )
 
 
 @app.command()
@@ -278,6 +290,67 @@ def repos(
     for r in found:
         table.add_row(make_display_path(r, valid_dirs), str(r))
     console.print(table)
+
+
+template_app = typer.Typer(
+    name="template",
+    help="Manage reusable repo templates for spawning workspaces.",
+    no_args_is_help=True,
+)
+app.add_typer(template_app)
+
+
+@template_app.command("list")
+def template_list(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
+):
+    """List saved templates."""
+    from .templates import run_template_list
+    run_template_list(json_output=json_output)
+
+
+@template_app.command("save")
+def template_save(
+    name: str = typer.Argument(..., help="Template name, e.g. image-gen"),
+    repos: str = typer.Option(None, "--repos", help="Comma-separated repo names (skips the picker)"),
+    base: str = typer.Option(None, "--base", help="Default base branch for this template"),
+    description: str = typer.Option(None, "--description", "-d", help="Short description shown in listings"),
+    no_input: bool = typer.Option(False, "--no-input", "-n", help="Non-interactive mode for agents/scripts (requires --repos)"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
+):
+    """Create or update a template. Omit --repos to pick repos interactively."""
+    from .templates import run_template_save
+    cfg = _ensure_config()
+    run_template_save(
+        cfg,
+        name,
+        repos_arg=repos,
+        base=base,
+        description=description,
+        no_input=no_input,
+        json_output=json_output,
+    )
+
+
+@template_app.command("show")
+def template_show(
+    name: str = typer.Argument(..., help="Template name"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
+):
+    """Show a single template."""
+    from .templates import run_template_show
+    run_template_show(name, json_output=json_output)
+
+
+@template_app.command("delete")
+def template_delete(
+    name: str = typer.Argument(..., help="Template name"),
+    no_input: bool = typer.Option(False, "--no-input", "-n", help="Skip the confirmation prompt"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON to stdout"),
+):
+    """Delete a template. Existing workspaces are untouched."""
+    from .templates import run_template_delete
+    run_template_delete(name, no_input=no_input, json_output=json_output)
 
 
 @app.command()

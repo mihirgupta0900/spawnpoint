@@ -23,6 +23,12 @@ dependencies = [
     "rich>=13",
 ]
 
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [project.urls]
 Homepage = "https://github.com/mihirgupta0900/spawnpoint"
 Repository = "https://github.com/mihirgupta0900/spawnpoint"

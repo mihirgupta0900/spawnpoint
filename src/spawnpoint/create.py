@@ -5,13 +5,22 @@ from typing import Any, Dict, List
 
 import typer
 from InquirerPy import inquirer
-from InquirerPy.prompts.fuzzy import FuzzyPrompt
 from rich.console import Console
 from rich.progress import track
 
 from .config import CD_PATH_FILE, Config
-from .io import emit_json, parse_csv, require, resolve_names
+from .io import emit_json, parse_csv, require, resolve_repos
 from .log import logger
+from .prompts import select_repos
+from .templates import (
+    get_template,
+    load_templates,
+    merge_template,
+    preselect_template_repos,
+    prompt_for_template,
+    template_repo_hint,
+    upsert_template,
+)
 from .utils import (
     copy_essential_files,
     detect_default_branch,
@@ -23,38 +32,6 @@ from .utils import (
 console = Console(stderr=True)
 
 
-class ClearOnToggleFuzzyPrompt(FuzzyPrompt):
-    """FuzzyPrompt that clears search and shows selected repos on toggle."""
-
-    def _handle_toggle_choice(self, _) -> None:
-        super()._handle_toggle_choice(_)
-        self._buffer.reset()
-        # Reset filtered list to show all choices (not just previous search results)
-        for choice in self.content_control.choices:
-            choice["indices"] = []
-        self.content_control._filtered_choices = self.content_control.choices
-
-    def _generate_after_input(self):
-        display = super()._generate_after_input()
-        selected = self.selected_choices
-        if selected:
-            names = ", ".join(c["name"] for c in selected)
-            display.append(("", "  "))
-            display.append(("class:fuzzy_info", f"Selected: {names}"))
-        return display
-
-
-def _resolve_repos(requested, choice_to_path):
-    """Resolve a CSV repo arg against available repos by display label or dir name."""
-    name_to_value = dict(choice_to_path)
-    aliases: dict[str, list[str]] = {}
-    for label, path in choice_to_path.items():
-        aliases.setdefault(path.name, []).append(label)
-    return resolve_names(
-        requested, name_to_value, kind="repo", err=console, aliases=aliases
-    )
-
-
 def run_create(
     cfg: Config,
     yes: bool = False,
@@ -63,6 +40,8 @@ def run_create(
     repos_arg: str | None = None,
     branch: str | None = None,
     base: str | None = None,
+    template: str | None = None,
+    save_template: str | None = None,
     json_output: bool = False,
 ):
     """Select git repos and create worktrees for a feature branch."""
@@ -70,6 +49,9 @@ def run_create(
         console.print("[bold red]Error:[/bold red] No scan directories configured.")
         console.print("Run [bold]spawnpoint init[/bold] to set up.")
         raise typer.Exit(code=1)
+
+    # Validate a named template before the repo scan so typos fail fast.
+    active_template = get_template(template) if template else None
 
     # Validate scan dirs exist
     valid_dirs = [d for d in cfg.scan_dirs if d.is_dir()]
@@ -95,15 +77,48 @@ def run_create(
     choices = [make_display_path(repo, valid_dirs) for repo in repos]
     choice_to_path = dict(zip(choices, repos))
 
+    # Offer saved templates as a starting point when nothing was passed by flag.
+    if active_template is None and not no_input and not repos_arg:
+        saved_templates = load_templates()
+        if saved_templates:
+            active_template = prompt_for_template(saved_templates)
+
+    if active_template:
+        console.print(f"\n[bold blue]Template:[/bold blue] {active_template.name}")
+        if repos_arg:
+            console.print("  [dim]--repos overrides its repo list[/dim]")
+        else:
+            console.print(f"  [dim]repos: {', '.join(active_template.repos)}[/dim]")
+        if base is None and active_template.base:
+            base = active_template.base
+            console.print(f"  [dim]base branch: {base}[/dim]")
+
     if no_input:
-        requested = parse_csv(require(repos_arg, "--repos", console))
-        selected_repos = _resolve_repos(requested, choice_to_path)
+        if not repos_arg and not active_template:
+            console.print("[bold red]Error:[/bold red] --no-input requires --repos or --template.")
+            raise typer.Exit(code=1)
+        if repos_arg:
+            # An explicit --repos wins over the template's repo list.
+            selected_repos = resolve_repos(parse_csv(repos_arg), choice_to_path, err=console)
+        else:
+            selected_repos = resolve_repos(
+                active_template.repos,
+                choice_to_path,
+                err=console,
+                hint=template_repo_hint(active_template.name),
+            )
+        if not selected_repos:
+            console.print("[bold red]Error:[/bold red] No repositories to spawn.")
+            raise typer.Exit(code=1)
     else:
-        selected_labels = ClearOnToggleFuzzyPrompt(
-            message="Select repositories (type to search):",
-            choices=choices,
-            multiselect=True,
-        ).execute()
+        preselected = (
+            preselect_template_repos(active_template, choice_to_path) if active_template else []
+        )
+        selected_labels = select_repos(
+            "Select repositories (type to search):",
+            choices,
+            preselected=preselected,
+        )
 
         if not selected_labels:
             console.print("No repositories selected. Exiting.")
@@ -177,8 +192,12 @@ def run_create(
         else:
             # Branch needs creation — detect default branch
             detected = detect_default_branch(repo_path)
-            if no_input:
-                base_branch = base or detected
+            if base:
+                # An explicit --base (or a template's base) applies to every repo.
+                base_branch = base
+                console.print(f"  [dim]{repo_name}: creating from {base_branch}[/dim]")
+            elif no_input:
+                base_branch = detected
                 if not base_branch:
                     console.print(
                         f"[bold red]Error:[/bold red] [{repo_name}] branch '{branch_name}' "
@@ -227,6 +246,20 @@ def run_create(
     if not no_input and not inquirer.confirm(message="Proceed?", default=True).execute():
         console.print("Aborted.")
         raise typer.Exit()
+
+    # Remember this repo set for next time.
+    if save_template:
+        saved_path, existed = upsert_template(
+            merge_template(
+                save_template,
+                [make_display_path(p, valid_dirs) for p in selected_repos],
+                base=base,
+            )
+        )
+        console.print(
+            f"[green]{'Updated' if existed else 'Saved'} template "
+            f"'{save_template}'[/green] [dim]({saved_path})[/dim]"
+        )
 
     # Phase 3: Execute
     for action in track(repo_actions, description="Creating worktrees..."):
@@ -299,6 +332,7 @@ def run_create(
         emit_json({
             "workspace": str(workspace_path),
             "branch": branch_name,
+            "template": active_template.name if active_template else None,
             "repos": [
                 {
                     "name": a["repo_name"],

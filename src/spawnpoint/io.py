@@ -6,6 +6,7 @@ and fail fast (non-zero exit, clear message) instead of hanging on a TTY.
 """
 
 import json as _json
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import typer
@@ -37,12 +38,14 @@ def resolve_names(
     kind: str,
     err: Console,
     aliases: Optional[Dict[str, List[str]]] = None,
+    hint: Optional[str] = None,
 ) -> List[object]:
     """Resolve requested names against available choices.
 
     ``name_to_value`` maps the canonical display name to its value. ``aliases``
     optionally maps an alternate name (e.g. a bare repo dir name) to the list of
-    canonical names it could refer to — used to detect ambiguity.
+    canonical names it could refer to — used to detect ambiguity. ``hint`` is an
+    extra line printed on failure, e.g. naming the template the names came from.
 
     Exits non-zero on any unknown name or ambiguous bare name, listing the valid
     choices so an agent can correct its call.
@@ -59,6 +62,8 @@ def resolve_names(
                     f"[bold red]Error:[/bold red] {kind} '{name}' is ambiguous; "
                     f"matches: {', '.join(matches)}. Use the full name."
                 )
+                if hint:
+                    err.print(hint)
                 raise typer.Exit(code=1)
             resolved.append(name_to_value[matches[0]])
             continue
@@ -66,8 +71,31 @@ def resolve_names(
             f"[bold red]Error:[/bold red] {kind} '{name}' not found. "
             f"Valid: {', '.join(sorted(name_to_value)) or '(none)'}"
         )
+        if hint:
+            err.print(hint)
         raise typer.Exit(code=1)
     return resolved
+
+
+def resolve_repos(
+    requested: List[str],
+    choice_to_path: Dict[str, Path],
+    *,
+    err: Console,
+    hint: Optional[str] = None,
+) -> List[Path]:
+    """Resolve repo names against available repos by display label or bare dir name."""
+    aliases: Dict[str, List[str]] = {}
+    for label, path in choice_to_path.items():
+        aliases.setdefault(path.name, []).append(label)
+    return resolve_names(
+        requested,
+        dict(choice_to_path),
+        kind="repo",
+        err=err,
+        aliases=aliases,
+        hint=hint,
+    )
 
 
 def emit_json(payload: object) -> None:
