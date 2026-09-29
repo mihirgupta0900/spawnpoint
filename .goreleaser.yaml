@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+project_name: spawnpoint
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  # GitHub releases, Homebrew, install.sh and `sp update` self-updates.
+  - id: spawnpoint
+    main: .
+    binary: spawnpoint
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+  # Same binary, marked as installed from PyPI so `sp update` defers to
+  # pipx / uv / pip. Packed into wheels by scripts/build_wheels.py.
+  - id: pypi
+    main: .
+    binary: spawnpoint
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X github.com/mihirgupta0900/spawnpoint/internal/update.Channel=pypi
+
+archives:
+  - id: spawnpoint
+    ids: [spawnpoint]
+    # No version in the name, so /releases/latest/download/<name> always works.
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [LICENSE, README.md]
+
+checksum:
+  name_template: checksums.txt
+
+homebrew_casks:
+  - name: spawnpoint
+    ids: [spawnpoint]
+    repository:
+      owner: mihirgupta0900
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/mihirgupta0900/spawnpoint
+    description: "One branch. Every repo. Ready to code. Multi-repo git worktree workspaces for you and your coding agents."
+    license: MIT
+    binaries: [spawnpoint]
+    custom_block: |
+      binary "spawnpoint", target: "sp"
+    hooks:
+      post:
+        # The binary isn't notarized; clear the quarantine flag so macOS runs it.
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/spawnpoint"]
+          end
+
+# Local test builds: GORELEASER_CURRENT_TAG=v1.2.3 goreleaser release --snapshot --clean
+snapshot:
+  version_template: "{{ .Version }}"
+
+changelog:
+  use: github-native
+
+release:
+  github:
+    owner: mihirgupta0900
+    name: spawnpoint

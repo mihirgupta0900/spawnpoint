@@ -1,4 +1,6 @@
-name: Publish to PyPI
+# Release: GitHub release (binaries + checksums), Homebrew cask, and PyPI wheels.
+# Keep this filename: PyPI trusted publishing is bound to it.
+name: Release
 
 on:
   push:
@@ -16,12 +18,12 @@ on:
           - major
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      id-token: write
-      contents: write
+      id-token: write # PyPI trusted publishing
+      contents: write # GitHub release
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,19 +50,31 @@ jobs:
           git tag "v${{ steps.version.outputs.next }}"
           git push origin "v${{ steps.version.outputs.next }}"
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
+
+      - name: GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Fine-grained PAT with contents:write on mihirgupta0900/homebrew-tap.
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Build
-        run: pip install hatch && hatch build
+      - name: Build PyPI wheels
+        run: python scripts/build_wheels.py
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', steps.version.outputs.next) || github.ref_name }}
-          generate_release_notes: true
-          files: dist/*
+          packages-dir: dist/wheels
