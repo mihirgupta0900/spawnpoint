@@ -7,24 +7,18 @@ import { Soundtrack } from "./audio";
 import { Chore, Hook } from "./scenes/Problem";
 import { Reveal } from "./scenes/Reveal";
 import { Demo, DEMO_LENGTH } from "./scenes/Demo";
-import { Tree } from "./scenes/Tree";
 import { Agents } from "./scenes/Agents";
-import { Features } from "./scenes/Features";
-import { Install, INSTALL_LENGTH } from "./scenes/Install";
 import { Outro } from "./scenes/Outro";
 
 const T = 15;
 
 export const SCENES = [
-  { id: "hook", C: Hook, len: 85 },
-  { id: "chore", C: Chore, len: 190 },
-  { id: "reveal", C: Reveal, len: 120 },
+  { id: "hook", C: Hook, len: 75 },
+  { id: "chore", C: Chore, len: 140 },
+  { id: "reveal", C: Reveal, len: 100 },
   { id: "demo", C: Demo, len: DEMO_LENGTH },
-  { id: "tree", C: Tree, len: 190 },
-  { id: "agents", C: Agents, len: 290 },
-  { id: "features", C: Features, len: 170 },
-  { id: "install", C: Install, len: INSTALL_LENGTH },
-  { id: "outro", C: Outro, len: 140 },
+  { id: "agents", C: Agents, len: 210 },
+  { id: "outro", C: Outro, len: 150 },
 ];
 
 export const TOTAL = SCENES.reduce((a, s) => a + s.len, 0) - T * (SCENES.length - 1);

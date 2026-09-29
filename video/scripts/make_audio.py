@@ -3,7 +3,7 @@
 Everything is generated from scratch (no samples), so the audio is ours to
 ship. Timings come from src/Video.tsx; rerun after changing scene lengths:
 
-    python scripts/make_audio.py --fps 30 --total 1735 --reveal 245 --outro 1595
+    python scripts/make_audio.py --fps 30 --total 900 --reveal 185 --outro 750
 
 Needs numpy and ffmpeg.
 """

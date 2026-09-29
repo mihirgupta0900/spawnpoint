@@ -30,7 +30,27 @@ export const Outro: React.FC = () => {
           <span style={{ color: c.purple }}>$</span> brew install mihirgupta0900/tap/spawnpoint
         </div>
       </FadeUp>
-      <FadeUp delay={32} style={{ marginTop: 40 }}>
+      <FadeUp delay={30} style={{ marginTop: 30 }}>
+        <div style={{ display: "flex", gap: 18 }}>
+          {["single native binary", "~20 ms startup", "sp update keeps it current"].map((t) => (
+            <span
+              key={t}
+              style={{
+                fontFamily: fonts.mono,
+                fontSize: 22,
+                padding: "8px 20px",
+                borderRadius: 999,
+                border: `1px solid ${c.green}55`,
+                background: `${c.green}14`,
+                color: c.green,
+              }}
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      </FadeUp>
+      <FadeUp delay={40} style={{ marginTop: 44 }}>
         <div style={{ fontFamily: fonts.mono, fontSize: 28, color: c.dim }}>
           github.com/<span style={{ color: c.text }}>mihirgupta0900/spawnpoint</span>
         </div>

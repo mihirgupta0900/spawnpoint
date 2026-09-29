@@ -1,7 +1,6 @@
 import React from "react";
 import { Html5Audio, Sequence, staticFile } from "remotion";
 import { DEMO_SFX } from "./scenes/Demo";
-import { INSTALL_SFX } from "./scenes/Install";
 
 // Audio is synthesized by scripts/make_audio.py into public/audio/.
 // Frames below are relative to each scene's start, and mirror the scene's
@@ -25,14 +24,11 @@ const range = (n: number, at: (i: number) => number, kind: Kind, vol?: number): 
 const SCENE_SFX: Record<string, Cue[]> = {
   hook: range(3, (i) => 14 + i * 7, "pop"),
   // One keystroke per chore line, then the headline lands.
-  chore: [...range(13, (i) => 10 + (i + 1) * 7, "click", 0.25), { f: 107, kind: "pop" }],
+  chore: [...range(13, (i) => 10 + (i + 1) * 5, "click", 0.25), { f: 81, kind: "pop" }],
   reveal: [{ f: 0, kind: "impact" }],
   demo: DEMO_SFX,
-  tree: [...range(3, (i) => 40 + i * 12, "pop"), ...range(9, (i) => 40 + Math.floor(i / 3) * 12 + 14 + (i % 3) * 6, "click", 0.2)],
-  agents: [...range(3, (i) => 20 + i * 10, "pop"), ...range(9, (i) => 20 + (i % 3) * 10 + 94 + Math.floor(i / 3) * 16, "tick", 0.18)],
-  features: range(6, (i) => 12 + i * 6, "pop", 0.22),
-  install: INSTALL_SFX,
-  outro: [{ f: 22, kind: "tick" }],
+  agents: [...range(3, (i) => 20 + i * 10, "pop"), ...range(9, (i) => 20 + (i % 3) * 10 + 66 + Math.floor(i / 3) * 12, "tick", 0.18)],
+  outro: [{ f: 22, kind: "tick" }, ...range(3, (i) => 30 + i * 3, "pop", 0.2)],
 };
 
 const Cue: React.FC<{ from: number; kind: Kind; vol?: number }> = ({ from, kind, vol }) => (

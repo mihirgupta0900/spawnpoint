@@ -62,7 +62,7 @@ const CHORE = [
 /** The manual chore, cascading. */
 export const Chore: React.FC = () => {
   const frame = useCurrentFrame();
-  const perLine = 7;
+  const perLine = 5;
   const visible = Math.floor((frame - 10) / perLine);
   const minutes = interpolate(frame, [10, 10 + CHORE.length * perLine], [0, 14], clamp);
   const headline = useSpring(10 + CHORE.length * perLine + 6);

@@ -31,9 +31,9 @@ const AgentPane: React.FC<{ a: (typeof AGENTS)[number]; i: number }> = ({ a, i }
   const frame = useCurrentFrame();
   const delay = 20 + i * 10;
   const s = useSpring(delay);
-  const cmd = useTyped(`spawnpoint create --no-input --json --repos ${a.repos} --branch ${a.branch}`, delay + 12, 60);
-  const jsonAt = delay + 70;
-  const editsAt = jsonAt + 24;
+  const cmd = useTyped(`spawnpoint create --no-input --json --repos ${a.repos} --branch ${a.branch}`, delay + 10, 80);
+  const jsonAt = delay + 50;
+  const editsAt = jsonAt + 16;
   const slug = a.branch.replace("/", "-");
   return (
     <div style={{ opacity: s, transform: `translateY(${(1 - s) * 50}px)` }}>
@@ -68,7 +68,7 @@ const AgentPane: React.FC<{ a: (typeof AGENTS)[number]; i: number }> = ({ a, i }
         )}
         <div style={{ marginTop: 18 }}>
           {a.edits.map((e, j) => {
-            const at = editsAt + j * 16;
+            const at = editsAt + j * 12;
             const p = interpolate(frame, [at, at + 10], [0, 1], clamp);
             return (
               <div key={e} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 19, lineHeight: "40px", opacity: p }}>
@@ -86,7 +86,7 @@ const AgentPane: React.FC<{ a: (typeof AGENTS)[number]; i: number }> = ({ a, i }
 
 export const Agents: React.FC = () => {
   const frame = useCurrentFrame();
-  const pills = interpolate(frame, [190, 210], [0, 1], clamp);
+  const pills = interpolate(frame, [140, 158], [0, 1], clamp);
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", gap: 50 }}>
       <FadeUp>

@@ -10,61 +10,59 @@ import { Eyebrow, FadeUp, Window } from "../ui";
 const REPOS = ["api", "billing-docs", "design-system", "infra", "mobile", "web", "worker"];
 
 const T = {
-  cmd: 6, // "sp create" starts typing
-  found: 34,
-  picker: 40,
-  pickerDone: 124,
-  branch: 130,
-  branchDone: 168,
-  fetch: 172,
-  fetchDone: 204,
-  base: 210,
-  baseDone: 230,
-  plan: 236,
-  proceed: 256,
-  proceedDone: 270,
-  save: 276,
-  saveDone: 290,
-  build: 296,
-  npmDone: 346,
-  done: 382,
-  claude: 396,
+  cmd: 4, // "sp create" starts typing
+  found: 24,
+  picker: 28,
+  pickerDone: 86,
+  branch: 90,
+  branchDone: 122,
+  fetch: 125,
+  fetchDone: 145,
+  base: 149,
+  baseDone: 165,
+  plan: 169,
+  proceed: 184,
+  proceedDone: 196,
+  build: 200,
+  npmDone: 232,
+  done: 252,
+  claude: 262,
 };
-export const DEMO_LENGTH = 450;
+export const DEMO_LENGTH = 300;
 
 // Picker keystrokes: text is typed, "tab" toggles, "enter" confirms.
 const PICKER_KEYS: { f: number; k: string }[] = [
-  { f: 50, k: "a" },
-  { f: 54, k: "p" },
+  { f: 34, k: "a" },
+  { f: 37, k: "p" },
+  { f: 43, k: "tab" },
+  { f: 50, k: "w" },
+  { f: 53, k: "o" },
+  { f: 56, k: "r" },
   { f: 62, k: "tab" },
-  { f: 72, k: "w" },
-  { f: 76, k: "o" },
-  { f: 80, k: "r" },
-  { f: 90, k: "tab" },
-  { f: 100, k: "w" },
-  { f: 104, k: "e" },
-  { f: 112, k: "tab" },
+  { f: 69, k: "w" },
+  { f: 72, k: "e" },
+  { f: 78, k: "tab" },
   { f: T.pickerDone, k: "enter" },
 ];
 const BRANCH = "feat/billing";
 const typedAt = (start: number, text: string, every: number) =>
   text.split("").map((_, i) => start + i * every);
-const CMD_KEYS = typedAt(T.cmd, "sp create", 3);
-const BRANCH_KEYS = typedAt(T.branch + 6, BRANCH, 2);
+const CMD_KEYS = typedAt(T.cmd, "sp create", 2);
+const BRANCH_KEYS = typedAt(T.branch + 4, BRANCH, 2);
 const CLAUDE_KEYS = typedAt(T.claude + 4, "claude", 3);
 
 // Per-repo build steps: [frame, text, isSpinnerUntil?]
 const BUILD: { f: number; repo?: string; line?: string; spinUntil?: number }[] = [
   { f: T.build + 2, repo: "api" },
-  { f: T.build + 8, line: "worktree" },
-  { f: T.build + 14, line: "copied .env, CLAUDE.md" },
-  { f: T.build + 22, repo: "web" },
-  { f: T.build + 28, line: "worktree" },
-  { f: T.build + 34, line: "copied .env.local, CLAUDE.md" },
-  { f: T.build + 38, line: "npm install", spinUntil: T.npmDone },
-  { f: T.npmDone + 6, repo: "worker" },
-  { f: T.npmDone + 12, line: "worktree" },
-  { f: T.npmDone + 18, line: "copied .env" },
+  { f: T.build + 6, line: "worktree" },
+  { f: T.build + 10, line: "copied .env, CLAUDE.md" },
+  { f: T.build + 15, repo: "web" },
+  { f: T.build + 19, line: "worktree" },
+  { f: T.build + 23, line: "copied .env.local, CLAUDE.md" },
+  { f: T.build + 27, line: "npm install", spinUntil: T.npmDone },
+  { f: T.npmDone + 4, repo: "worker" },
+  { f: T.npmDone + 8, line: "worktree" },
+  { f: T.npmDone + 12, line: "copied .env" },
 ];
 
 export type Sfx = { f: number; kind: "click" | "enter" | "tick" | "pop" };
@@ -82,8 +80,6 @@ export const DEMO_SFX: Sfx[] = [
   { f: T.baseDone + 1, kind: "tick" },
   { f: T.proceedDone, kind: "enter" },
   { f: T.proceedDone + 1, kind: "tick" },
-  { f: T.saveDone, kind: "enter" },
-  { f: T.saveDone + 1, kind: "tick" },
   ...BUILD.filter((b) => b.line).map((b) => ({ f: b.spinUntil ?? b.f, kind: "tick" as const })),
   { f: T.done, kind: "pop" },
   ...CLAUDE_KEYS.map((f) => ({ f, kind: "click" as const })),
@@ -334,10 +330,6 @@ function terminalLines(frame: number): React.ReactNode[] {
   ];
   if (frame < T.proceedDone) return [...L, ...confirm("pr", "Proceed?", true)];
   L.push(<Answer key="a4" q="Proceed?" a="Yes" />);
-  if (frame < T.save) return L;
-  const saveQ = "Save these 3 repos as a template for next time?";
-  if (frame < T.saveDone) return [...L, ...confirm("sv", saveQ, false)];
-  L.push(<Answer key="a5" q={saveQ} a="No" />);
   if (frame < T.build) return L;
   L.push(<Line key="bb" />);
 
