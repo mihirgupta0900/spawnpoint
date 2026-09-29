@@ -1,18 +1,81 @@
+<div align="center">
+
 # Spawnpoint
 
-![Spawnpoint](./assets/social-preview.png)
+**One branch. Every repo. Ready to code.**
 
-Spawn multi-repo worktree workspaces for feature development.
+Spawnpoint gives every task its own folder: a git worktree for each repo it touches, all on the same branch, with `.env` files copied and dependencies installed.<br>
+Point Claude Code, Codex, Cursor, Gemini CLI, or yourself at it and start working.
 
-Working on a feature that spans multiple repos? Spawnpoint creates a dedicated folder with git worktrees from each repo on the same branch, installs dependencies, and copies over config files — so you can start coding (or start a Claude session) immediately.
+[![Watch the 45-second overview](./assets/spawnpoint.gif)](./assets/spawnpoint.mp4)
 
-![Demo](./demo/demo.gif)
+<sub>▶ <a href="./assets/spawnpoint.mp4">Watch in HD (MP4)</a></sub>
+
+</div>
+
+```sh
+pipx install spawnpoint
+sp create            # pick repos, name a branch, done
+```
+
+## Why Spawnpoint
+
+Worktrees are how you run agents in parallel without them tripping over each other. They don't make a fresh checkout usable, though, and they only cover one repo at a time.
+
+- **Your feature spans repos.** Billing touches `api`, `web`, and `worker`. Most worktree tools handle one repo at a time. Spawnpoint puts all three in one folder on one branch, so you and your agent see the whole change.
+- **A fresh worktree won't run yet.** It has no `.env`, no `node_modules`, no `.venv`, and no submodules, so your agent's first ten minutes go to setup. Spawnpoint copies env and agent files (`.env*`, `CLAUDE.md`, `AGENT.md`) and installs dependencies with whatever each repo uses: npm, pnpm, yarn, bun, uv, poetry, pip, bundler, or go.
+- **Parallel agents need separate checkouts.** Two agents in one checkout overwrite each other's edits and branch switches. With a workspace per task, each agent gets its own branch, files, and dependencies.
+- **Old worktrees fill your disk.** Ten worktrees with `node_modules` add up to gigabytes. `sp light-cleanup` deletes the reinstallable directories and keeps your code.
+
+```
+~/.spawnpoint/workspaces/feat-billing/
+├── api/      ⎇ feat/billing   .env  CLAUDE.md  .venv
+├── web/      ⎇ feat/billing   .env.local  CLAUDE.md  node_modules
+└── worker/   ⎇ feat/billing   .env  submodules  node_modules
+```
+
+The checkouts in `~/code` are never touched.
+
+## Built for coding agents
+
+Spawnpoint builds the workspace and leaves the rest to you. It isn't an agent GUI, so any agent, editor, or terminal can use it, and an agent can create its own workspaces.
+
+**Install the agent skill** ([skills.sh](https://www.skills.sh)). Claude Code, Codex, and other skill-aware agents learn to call Spawnpoint headlessly:
+
+```sh
+npx skills add mihirgupta0900/spawnpoint
+```
+
+**Or drive it from any script or agent.** Every command runs with `--no-input --json`, never waits on a prompt, and prints JSON you can parse:
+
+```sh
+$ spawnpoint create --no-input --json --repos api,web --branch feat/billing
+{
+  "workspace": "/Users/you/.spawnpoint/workspaces/feat-billing",
+  "branch": "feat/billing",
+  "template": null,
+  "repos": [
+    { "name": "api", "branch": "feat/billing", "base": "main", "action": "create", "status": "created" },
+    { "name": "web", "branch": "feat/billing", "base": "main", "action": "create", "status": "created" }
+  ]
+}
+```
+
+A typical parallel setup runs one workspace per agent:
+
+```sh
+sp create --no-input --repos api,web        --branch feat/billing      # → Claude Code
+sp create --no-input --repos api,worker     --branch fix/auth-timeout  # → Codex
+sp create --no-input --template search-stack --branch feat/search      # → Gemini CLI
+```
+
+See [Non-Interactive Mode](#non-interactive-mode-for-agents--scripts) for every flag.
 
 ## Install
 
 ### macOS app
 
-Download the latest `.dmg` from [Releases](https://github.com/mihirgupta0900/spawnpoint/releases?q=mac) and drag Spawnpoint into Applications. Lives in your menu bar — no terminal required.
+Download the latest `.dmg` from [Releases](https://github.com/mihirgupta0900/spawnpoint/releases?q=mac) and drag Spawnpoint into Applications. It lives in your menu bar, so you don't need a terminal.
 
 Source: [`mac/`](./mac).
 
@@ -44,19 +107,19 @@ sp template save image-gen   # remember a set of repos you spawn together
 sp create -t image-gen       # spawn that set again
 ```
 
-On first run, Spawnpoint will ask you to configure your scan directories and workspace location.
+On first run, Spawnpoint asks you to configure your scan directories and workspace location.
 
 ## How It Works
 
-1. **Select repos** — Spawnpoint scans your code directories and presents a fuzzy-searchable list of git repos
-2. **Name a branch** — Enter a branch name for your feature
-3. **Spawn** — For each repo, Spawnpoint:
-   - Creates a git worktree (or new branch if needed)
+1. **Select repos.** Spawnpoint scans your code directories and shows a fuzzy-searchable list of git repos.
+2. **Name a branch.** Enter a branch name for your feature.
+3. **Spawn.** For each repo, Spawnpoint:
+   - Creates a git worktree, and a new branch if needed, from the latest remote tip
    - Initializes submodules
    - Copies `.env` files, `CLAUDE.md`, and other config files from the original repo
    - Installs dependencies (detects npm/pnpm/yarn/bun, pip/uv/poetry, bundler, go modules)
 
-All worktrees land in a single folder (`~/.spawnpoint/workspaces/<branch-name>/`) so you can open the whole workspace in your editor or start an AI coding session.
+All worktrees land in a single folder (`~/.spawnpoint/workspaces/<branch-name>/`). Open the whole workspace in your editor or start an AI coding session there.
 
 ## Commands
 
