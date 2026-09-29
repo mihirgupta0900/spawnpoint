@@ -19,7 +19,7 @@ export const Outro: React.FC = () => {
         <div
           style={{
             fontFamily: fonts.mono,
-            fontSize: 44,
+            fontSize: 38,
             padding: "22px 44px",
             borderRadius: 16,
             background: c.panel,
@@ -27,7 +27,7 @@ export const Outro: React.FC = () => {
             boxShadow: `0 0 60px ${c.blue}22`,
           }}
         >
-          <span style={{ color: c.purple }}>$</span> pipx install spawnpoint
+          <span style={{ color: c.purple }}>$</span> brew install mihirgupta0900/tap/spawnpoint
         </div>
       </FadeUp>
       <FadeUp delay={32} style={{ marginTop: 40 }}>

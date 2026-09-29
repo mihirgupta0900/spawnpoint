@@ -7,16 +7,18 @@
 Spawnpoint gives every task its own folder: a git worktree for each repo it touches, all on the same branch, with `.env` files copied and dependencies installed.<br>
 Point Claude Code, Codex, Cursor, Gemini CLI, or yourself at it and start working.
 
-[![Watch the 45-second overview](./assets/spawnpoint.gif)](./assets/spawnpoint.mp4)
+[![Watch the one-minute overview](./assets/spawnpoint.gif)](./assets/spawnpoint.mp4)
 
-<sub>▶ <a href="./assets/spawnpoint.mp4">Watch in HD (MP4)</a></sub>
+<sub>▶ <a href="./assets/spawnpoint.mp4">Watch in HD with sound (MP4)</a></sub>
 
 </div>
 
 ```sh
-pipx install spawnpoint
-sp create            # pick repos, name a branch, done
+brew install mihirgupta0900/tap/spawnpoint   # or: curl -fsSL https://raw.githubusercontent.com/mihirgupta0900/spawnpoint/main/install.sh | sh
+sp create                                    # pick repos, name a branch, done
 ```
+
+One native binary, about 20 ms to start, and `sp update` keeps it current however you installed it ([more options](#install)).
 
 ## Why Spawnpoint
 

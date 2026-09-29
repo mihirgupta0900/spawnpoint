@@ -3,12 +3,14 @@ import { linearTiming, TransitionSeries } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import { slide } from "@remotion/transitions/slide";
 import { Background } from "./ui";
+import { Soundtrack } from "./audio";
 import { Chore, Hook } from "./scenes/Problem";
 import { Reveal } from "./scenes/Reveal";
 import { Demo, DEMO_LENGTH } from "./scenes/Demo";
 import { Tree } from "./scenes/Tree";
 import { Agents } from "./scenes/Agents";
 import { Features } from "./scenes/Features";
+import { Install, INSTALL_LENGTH } from "./scenes/Install";
 import { Outro } from "./scenes/Outro";
 
 const T = 15;
@@ -21,10 +23,17 @@ export const SCENES = [
   { id: "tree", C: Tree, len: 190 },
   { id: "agents", C: Agents, len: 290 },
   { id: "features", C: Features, len: 170 },
+  { id: "install", C: Install, len: INSTALL_LENGTH },
   { id: "outro", C: Outro, len: 140 },
 ];
 
 export const TOTAL = SCENES.reduce((a, s) => a + s.len, 0) - T * (SCENES.length - 1);
+
+// Absolute start frame of each scene (transitions overlap by T).
+const STARTS = SCENES.map((s, i) => ({
+  id: s.id,
+  from: SCENES.slice(0, i).reduce((a, p) => a + p.len - T, 0),
+}));
 
 export const SpawnpointVideo: React.FC = () => (
   <Background>
@@ -43,5 +52,6 @@ export const SpawnpointVideo: React.FC = () => (
         ];
       })}
     </TransitionSeries>
+    <Soundtrack starts={STARTS} />
   </Background>
 );
