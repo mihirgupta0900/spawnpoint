@@ -1,34 +1,140 @@
+<div align="center">
+
 # Spawnpoint
 
-![Spawnpoint](./assets/social-preview.png)
+**One branch. Every repo. Ready to code.**
 
-Spawn multi-repo worktree workspaces for feature development.
+Spawnpoint gives every task its own folder: a git worktree for each repo it touches, all on the same branch, with `.env` files copied and dependencies installed.<br>
+Point Claude Code, Codex, Cursor, Gemini CLI, or yourself at it and start working.
 
-Working on a feature that spans multiple repos? Spawnpoint creates a dedicated folder with git worktrees from each repo on the same branch, installs dependencies, and copies over config files — so you can start coding (or start a Claude session) immediately.
+[![Watch the 30-second overview](./assets/spawnpoint.gif)](./assets/spawnpoint.mp4)
 
-![Demo](./demo/demo.gif)
+<sub>▶ <a href="./assets/spawnpoint.mp4">Watch in HD with sound (MP4)</a></sub>
+
+</div>
+
+```sh
+brew install mihirgupta0900/tap/spawnpoint   # or: curl -fsSL https://raw.githubusercontent.com/mihirgupta0900/spawnpoint/main/install.sh | sh
+sp create                                    # pick repos, name a branch, done
+```
+
+One native binary, about 20 ms to start, and `sp update` keeps it current however you installed it ([more options](#install)).
+
+## Why Spawnpoint
+
+Worktrees are how you run agents in parallel without them tripping over each other. They don't make a fresh checkout usable, though, and they only cover one repo at a time.
+
+- **Your feature spans repos.** Billing touches `api`, `web`, and `worker`. Most worktree tools handle one repo at a time. Spawnpoint puts all three in one folder on one branch, so you and your agent see the whole change.
+- **A fresh worktree won't run yet.** It has no `.env`, no `node_modules`, no `.venv`, and no submodules, so your agent's first ten minutes go to setup. Spawnpoint copies env and agent files (`.env*`, `CLAUDE.md`, `AGENT.md`) and installs dependencies with whatever each repo uses: npm, pnpm, yarn, bun, uv, poetry, pip, bundler, or go.
+- **Parallel agents need separate checkouts.** Two agents in one checkout overwrite each other's edits and branch switches. With a workspace per task, each agent gets its own branch, files, and dependencies.
+- **Old worktrees fill your disk.** Ten worktrees with `node_modules` add up to gigabytes. `sp light-cleanup` deletes the reinstallable directories and keeps your code.
+
+```
+~/.spawnpoint/workspaces/feat-billing/
+├── api/      ⎇ feat/billing   .env  CLAUDE.md  .venv
+├── web/      ⎇ feat/billing   .env.local  CLAUDE.md  node_modules
+└── worker/   ⎇ feat/billing   .env  submodules  node_modules
+```
+
+The checkouts in `~/code` are never touched.
+
+## Built for coding agents
+
+Spawnpoint builds the workspace and leaves the rest to you. It isn't an agent GUI, so any agent, editor, or terminal can use it, and an agent can create its own workspaces.
+
+**Install the agent skill** ([skills.sh](https://www.skills.sh)). Claude Code, Codex, and other skill-aware agents learn to call Spawnpoint headlessly:
+
+```sh
+npx skills add mihirgupta0900/spawnpoint
+```
+
+**Or drive it from any script or agent.** Every command runs with `--no-input --json`, never waits on a prompt, and prints JSON you can parse:
+
+```sh
+$ spawnpoint create --no-input --json --repos api,web --branch feat/billing
+{
+  "workspace": "/Users/you/.spawnpoint/workspaces/feat-billing",
+  "branch": "feat/billing",
+  "template": null,
+  "repos": [
+    { "name": "api", "branch": "feat/billing", "base": "main", "action": "create", "status": "created" },
+    { "name": "web", "branch": "feat/billing", "base": "main", "action": "create", "status": "created" }
+  ]
+}
+```
+
+A typical parallel setup runs one workspace per agent:
+
+```sh
+sp create --no-input --repos api,web        --branch feat/billing      # → Claude Code
+sp create --no-input --repos api,worker     --branch fix/auth-timeout  # → Codex
+sp create --no-input --template search-stack --branch feat/search      # → Gemini CLI
+```
+
+See [Non-Interactive Mode](#non-interactive-mode-for-agents--scripts) for every flag.
 
 ## Install
 
 ### macOS app
 
-Download the latest `.dmg` from [Releases](https://github.com/mihirgupta0900/spawnpoint/releases?q=mac) and drag Spawnpoint into Applications. Lives in your menu bar — no terminal required.
+Download the latest `.dmg` from [Releases](https://github.com/mihirgupta0900/spawnpoint/releases?q=mac) and drag Spawnpoint into Applications. It lives in your menu bar, so you don't need a terminal.
 
 Source: [`mac/`](./mac).
 
 ### CLI
 
-```
+Spawnpoint is a single native binary for macOS, Linux and Windows. Nothing else is needed at runtime besides `git`. Pick whichever installer you already use:
+
+```sh
+# Homebrew (macOS, Linux)
+brew install mihirgupta0900/tap/spawnpoint
+
+# Install script: downloads the release binary and verifies its checksum
+curl -fsSL https://raw.githubusercontent.com/mihirgupta0900/spawnpoint/main/install.sh | sh
+
+# pipx / uv / pip: same native binary, packaged as a wheel
 pipx install spawnpoint
+uv tool install spawnpoint
+
+# Go
+go install github.com/mihirgupta0900/spawnpoint@latest
 ```
 
-Or with pip:
+Or download a build from [Releases](https://github.com/mihirgupta0900/spawnpoint/releases). The install script puts the binary in `~/.local/bin`. Set `SPAWNPOINT_INSTALL_DIR` to change that, or `SPAWNPOINT_VERSION` to pin a version.
 
-```
-pip install spawnpoint
+This installs both `spawnpoint` and `sp` as commands (`go install` only provides `spawnpoint`; the [shell integration](#shell-integration) adds `sp`). All examples below use `sp` for brevity.
+
+## Updating
+
+```sh
+sp update          # upgrade to the latest release
+sp update --check  # just report whether one is available
 ```
 
-This installs both `spawnpoint` and `sp` as CLI commands. All examples below use `sp` for brevity.
+`sp update` detects how Spawnpoint was installed and upgrades it the same way, so it never ends up with two copies:
+
+| Installed with | `sp update` runs |
+|---|---|
+| Homebrew | `brew upgrade spawnpoint` |
+| pipx | `pipx upgrade spawnpoint` |
+| uv | `uv tool upgrade spawnpoint` |
+| pip | `python -m pip install --upgrade spawnpoint` |
+| `go install` | `go install github.com/mihirgupta0900/spawnpoint@latest` |
+| Install script / manual download | downloads the new release, verifies its checksum, and swaps the binary in place |
+
+Spawnpoint checks for new releases in the background at most once a day, then prints a one-line notice after a command. The check is skipped in `--json` / `--no-input` mode, and you can turn it off with `check_updates = false`.
+
+### Coming from the Python version (0.11 and earlier)
+
+You don't have to do anything special. Run `sp update` (or `pipx upgrade spawnpoint`) as usual, and pipx swaps the Python package for the native binary. Everything else stays as it is:
+
+- `~/.spawnpoint/config.toml` and `templates.toml` are read as-is
+- existing workspaces, the `sp()` shell function and the agent skill keep working
+- every `--no-input` / `--json` flag and output shape is unchanged
+
+What you get: startup in about 20 ms instead of about 90 ms, `list` roughly twice as fast, repos fetched in parallel, and no Python install to maintain. `--json` output is now always clean JSON. The Python release could mix progress output into stdout.
+
+If you'd rather switch to Homebrew or the install script, remove the pipx copy first: `pipx uninstall spawnpoint`. The install script refuses to overwrite a pipx or uv install, so you won't end up with two copies.
 
 ## Quick Start
 
@@ -44,19 +150,19 @@ sp template save image-gen   # remember a set of repos you spawn together
 sp create -t image-gen       # spawn that set again
 ```
 
-On first run, Spawnpoint will ask you to configure your scan directories and workspace location.
+On first run, Spawnpoint asks you to configure your scan directories and workspace location.
 
 ## How It Works
 
-1. **Select repos** — Spawnpoint scans your code directories and presents a fuzzy-searchable list of git repos
-2. **Name a branch** — Enter a branch name for your feature
-3. **Spawn** — For each repo, Spawnpoint:
-   - Creates a git worktree (or new branch if needed)
+1. **Select repos.** Spawnpoint scans your code directories and shows a fuzzy-searchable list of git repos.
+2. **Name a branch.** Enter a branch name for your feature.
+3. **Spawn.** For each repo, Spawnpoint:
+   - Creates a git worktree, and a new branch if needed, from the latest remote tip
    - Initializes submodules
    - Copies `.env` files, `CLAUDE.md`, and other config files from the original repo
    - Installs dependencies (detects npm/pnpm/yarn/bun, pip/uv/poetry, bundler, go modules)
 
-All worktrees land in a single folder (`~/.spawnpoint/workspaces/<branch-name>/`) so you can open the whole workspace in your editor or start an AI coding session.
+All worktrees land in a single folder (`~/.spawnpoint/workspaces/<branch-name>/`). Open the whole workspace in your editor or start an AI coding session there.
 
 ## Commands
 
@@ -79,8 +185,10 @@ All worktrees land in a single folder (`~/.spawnpoint/workspaces/<branch-name>/`
 | `sp config` | View current config |
 | `sp config --edit` | Edit config in $EDITOR |
 | `sp config --reset` | Reset to defaults |
-| `sp update` | Update to latest version |
+| `sp update` | Update to the latest version (via brew/pipx/uv/pip when that's how it was installed) |
+| `sp update --check` | Check for an update without installing it |
 | `sp --version` | Show version |
+| `sp completion <shell>` | Print a shell completion script (bash, zsh, fish, powershell) |
 
 ### Adding repos to a workspace
 
@@ -310,6 +418,8 @@ additional_worktree_dirs = ['~/.spawnpoint/workspaces']
 
 When creating a new branch, Spawnpoint automatically detects the repo's default branch to use as the base. No configuration needed.
 
+Set `SPAWNPOINT_DIR` to use a config directory other than `~/.spawnpoint`, e.g. for a throwaway setup in tests. The shell integration's auto-cd always reads `~/.spawnpoint/.cd_path`.
+
 ## Shell Integration
 
 During `sp init`, you'll be offered to install a shell function that wraps common commands with auto-cd:
@@ -342,13 +452,25 @@ Without shell integration, `sp` still works for all commands — you just won't 
 
 ## Requirements
 
-- Python 3.10+
 - git
+- macOS 12+, Linux (x86_64 / arm64, glibc or musl), or Windows (x86_64)
+
+## Development
+
+```sh
+go test ./...      # unit + end-to-end tests (real git repos in a temp $HOME)
+go run . --help
+GORELEASER_CURRENT_TAG=v1.2.3 goreleaser release --snapshot --clean   # local release build
+python scripts/build_wheels.py --version 1.2.3                         # PyPI wheels from that build
+```
+
+The e2e suite in `e2e/` pins the `--no-input` / `--json` contract. Point it at another build with `SPAWNPOINT_BIN=/path/to/spawnpoint go test ./e2e`.
 
 ## Uninstall
 
+Remove it with the tool you installed it with (`brew uninstall spawnpoint`, `pipx uninstall spawnpoint`, `uv tool uninstall spawnpoint`), or delete `~/.local/bin/spawnpoint` and `~/.local/bin/sp` for the install script. Then remove your config and templates:
+
 ```
-pipx uninstall spawnpoint
 rm -rf ~/.spawnpoint
 ```
 

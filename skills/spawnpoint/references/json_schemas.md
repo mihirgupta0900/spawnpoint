@@ -44,14 +44,14 @@ by `repos --json` / `list --json`. Unknown or ambiguous names exit non-zero with
       "name": "api",
       "branch": "feat/login",
       "base": "main",
-      "action": "new_branch | existing_branch | checkout",
-      "status": "created | success | failed"
+      "action": "create | add",
+      "status": "created | failed"
     }
   ]
 }
 ```
 
-`template` is the template the repo set came from, or `null` when repos were passed explicitly.
+`action` is `create` when the branch was new in that repo (branched from `base`) and `add` when it already existed locally or on origin (`base` is then `null`). `template` is the template the repo set came from, or `null` when repos were passed explicitly.
 
 Without `--json` (but with `--no-input`): stdout is just the workspace path; status text is on stderr.
 
@@ -64,7 +64,7 @@ Same shape as create, but the per-repo list key is `added` instead of `repos`:
   "workspace": "/Users/x/.spawnpoint/workspaces/feat-login",
   "branch": "feat/login",
   "added": [
-    { "name": "worker", "branch": "feat/login", "base": "main", "action": "new_branch", "status": "created" }
+    { "name": "worker", "branch": "feat/login", "base": "main", "action": "create", "status": "added" }
   ]
 }
 ```

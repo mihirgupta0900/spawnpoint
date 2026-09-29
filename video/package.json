@@ -1,0 +1,28 @@
+{
+  "name": "spawnpoint-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion source for the Spawnpoint overview video and social preview",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Spawnpoint out/spawnpoint.mp4 --codec=h264 --crf=18",
+    "gif": "ffmpeg -y -i out/spawnpoint.mp4 -vf \"fps=12,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle\" out/spawnpoint.gif",
+    "social": "remotion still src/index.ts Social out/social-preview.png",
+    "build": "npm run render && npm run gif && npm run social && cp out/spawnpoint.mp4 out/spawnpoint.gif out/social-preview.png ../assets/"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.529",
+    "@remotion/google-fonts": "^4.0.529",
+    "@remotion/transitions": "^4.0.529",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "remotion": "^4.0.529"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
+  }
+}
