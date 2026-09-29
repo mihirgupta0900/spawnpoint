@@ -56,7 +56,11 @@ homebrew_casks:
     repository:
       owner: mihirgupta0900
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+      # Push with a deploy key scoped to the tap repo (secret HOMEBREW_TAP_DEPLOY_KEY)
+      # rather than a personal access token.
+      git:
+        url: git@github.com:mihirgupta0900/homebrew-tap.git
+        private_key: "{{ .Env.HOMEBREW_TAP_DEPLOY_KEY }}"
     homepage: https://github.com/mihirgupta0900/spawnpoint
     description: "One branch. Every repo. Ready to code. Multi-repo git worktree workspaces for you and your coding agents."
     license: MIT
